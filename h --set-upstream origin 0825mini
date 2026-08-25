@@ -1,0 +1,19 @@
+[33mcommit d96ba34b3b7ab9343657a1d22b0f1ba83be0f799[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32m0825mini[m[33m)[m
+Author: SUNGWON JO <sungwon000604@gmail.com>
+Date:   Tue Aug 25 16:25:17 2026 +0900
+
+    미니 과제 py 파일 추가
+
+[33mcommit ce9e00267df71f226d3f4dc51f9bface44728168[m[33m ([m[1;31morigin/master[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmaster[m[33m)[m
+Author: SUNGWON JO <sungwon000604@gmail.com>
+Date:   Tue Aug 25 15:48:49 2026 +0900
+
+    git ignore 추가
+
+[33mcommit 19f5e4e5717e8706f72505ea8bdcc67bd611cd41[m
+Author: mitsuiJin <wlstngus1019@gmail.com>
+Date:   Tue Aug 25 15:31:50 2026 +0900
+
+    Add injection molding AI dataset, guidebook, and summary
+    
+    Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
