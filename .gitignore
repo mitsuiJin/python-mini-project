@@ -12,9 +12,9 @@ env/
 .env
 .env.*
 !.env.example
-
-# Jupyter Notebook
-.ipynb_checkpoints/
+#
+## Jupyter Notebook
+#.ipynb_checkpoints/
 
 # Test, lint, type-check, and coverage caches
 .pytest_cache/
