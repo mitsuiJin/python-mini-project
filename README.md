@@ -28,4 +28,10 @@ graph LR
     M --> N
 
     N --> O[Tkinter Dashboard]
+
+    %% 클래스 글자색
+    classDef pythonClass color:#0066ff;
+
+    %% 클래스 지정
+    class B,D,F,G,H,L,N pythonClass;
 ```
