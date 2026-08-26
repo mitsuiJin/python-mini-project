@@ -49,21 +49,35 @@ DEFECT_DATA = {
                 "injection molding gas defect "
                 "air trap causes remedies"
             ),
-            "url": AIR_TRAP_URL
+            "url": (
+                "https://help.autodesk.com/cloudhelp/2017/ENU/"
+                "MoldflowComm-UsersGuide/files/"
+                "GUID-E81A1CF3-0A91-43DE-8954-005E76897E51.htm"
+            )
         },
         {
             "query": (
                 "injection molding burn marks "
                 "trapped air troubleshooting"
             ),
-            "url": BURN_MARK_URL
+            "url": (
+                "https://help.autodesk.com/cloudhelp/2021/ENU/"
+                "MoldflowInsight-CLC-Troubleshoot/files/"
+                "Troubleshooting-molding-problems/"
+                "MoldflowInsight_CLC_Troubleshoot_"
+                "Troubleshooting_molding_problems_"
+                "Troubleshooting_burn_marks_html.html"
+            )
         },
         {
             "query": (
                 "injection mold poor venting "
                 "gas defect solution"
             ),
-            "url": AIR_TRAP_URL
+            "url": (
+                "https://www.injectionmould.org/"
+                "2019/03/13/mold-venting/"
+            )
         }
     ],
 
@@ -73,21 +87,34 @@ DEFECT_DATA = {
                 "injection molding short shot "
                 "causes remedies"
             ),
-            "url": SHORT_SHOT_URL
+            "url": (
+                "https://help.autodesk.com/cloudhelp/2021/ENU/"
+                "MoldflowInsight-CLC-Troubleshoot/files/"
+                "Troubleshooting-molding-problems/"
+                "MoldflowInsight_CLC_Troubleshoot_"
+                "Troubleshooting_molding_problems_"
+                "Troubleshooting_short_shot_html.html"
+            )
         },
         {
             "query": (
                 "incomplete filling "
                 "low injection pressure"
             ),
-            "url": SHORT_SHOT_URL
+            "url": (
+                "https://www.huarong.com.tw/page/news/"
+                "en/company_news/detail/138/"
+            )
         },
         {
             "query": (
                 "short shot mold temperature "
                 "injection speed troubleshooting"
             ),
-            "url": SHORT_SHOT_URL
+            "url": (
+                "https://www.fictiv.com/articles/"
+                "injection-molding-short-shot-defects"
+            )
         }
     ],
 
@@ -97,21 +124,28 @@ DEFECT_DATA = {
                 "injection molding startup scrap "
                 "process stabilization"
             ),
-            "url": SHORT_SHOT_URL
+            "url": (
+                "https://chenhsong.com/ichen-ai-molder/"
+            )
         },
         {
             "query": (
                 "injection molding startup "
                 "mold temperature stabilization"
             ),
-            "url": SHORT_SHOT_URL
+            "url": (
+                "https://www.mazin.tech/columns/33"
+            )
         },
         {
             "query": (
                 "injection molding first shot "
                 "defects after startup"
             ),
-            "url": SHORT_SHOT_URL
+            "url": (
+                "https://www.mangoapps.com/templates/"
+                "inspections/mold-tooling-pre-run-inspection"
+            )
         }
     ]
 }
