@@ -1,6 +1,5 @@
 import pandas as pd
 
-
 class DataLoader:
 
     def __init__(self):
@@ -15,10 +14,10 @@ class DataLoader:
     def get_shape(self):
         return self.df.shape
 
-    # 모든 컬럼(열) 확인
+    # 모든 컬럼(열) 리스트로 반환
     def get_columns(self):
         return self.df.columns.tolist()
 
-    # 각 컬럼의 데이터 타입 확인
+    # 각 컬럼의 데이터 타입 Pandas Series 로 반환
     def get_dtypes(self):
         return self.df.dtypes
