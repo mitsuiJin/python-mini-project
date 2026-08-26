@@ -13,13 +13,13 @@ plt.rcParams["axes.unicode_minus"] = False
 
 
 class DataVisualizer:
-    """Tkinter에 삽입할 수 있는 matplotlib Figure"""
+    """matplotlib Figure 시각화 그래프들"""
 
     def __init__(self, df: pd.DataFrame):
         self.df = df.copy()
 
     def plot_class_distribution(self, target_column: str) -> Figure:
-        """종속변수의 클래스별 건수를 막대그래프로 표시"""
+        """1. 종속변수의 클래스별 건수를 막대그래프로 표시"""
         self._require_column(target_column)
         counts = self.df[target_column].value_counts(dropna=False)
 
@@ -33,7 +33,7 @@ class DataVisualizer:
         return figure
 
     def plot_histogram(self, column: str, bins: int = 30) -> Figure:
-        """수치형 컬럼의 히스토그램을 생성"""
+        """2. 수치형 컬럼의 히스토그램을 생성"""
         self._require_numeric_column(column)
 
         figure, axis = plt.subplots(figsize=(7, 4))
@@ -46,7 +46,7 @@ class DataVisualizer:
         return figure
 
     def plot_boxplot(self, column: str, group_column: str | None = None) -> Figure:
-        """전체 또는 그룹별 수치형 컬럼의 박스플롯을 생성"""
+        """3. 전체 또는 그룹별 수치형 컬럼의 박스플롯을 생성"""
         self._require_numeric_column(column)
         figure, axis = plt.subplots(figsize=(8, 5))
 
@@ -67,7 +67,7 @@ class DataVisualizer:
         return figure
 
     def plot_correlation_heatmap(self) -> Figure:
-        """수치형 컬럼의 상관관계 히트맵을 생성"""
+        """4. 수치형 컬럼의 상관관계 히트맵을 생성"""
         correlation = self.df.select_dtypes(include="number").corr()
         if correlation.empty:
             raise ValueError("상관관계를 계산할 수치형 컬럼이 없습니다.")

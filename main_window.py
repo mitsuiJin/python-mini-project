@@ -27,7 +27,7 @@ DEFAULT_DATA_PATH = (
 class MainWindow:
     """데이터 로드부터 예측까지 각 클래스를 연결"""
 
-    PREVIEW_ROWS = 100
+    PREVIEW_ROWS = 100 # 행 미리보기 개수 설정
 
     def __init__(self, root: tk.Tk):
         self.root = root
@@ -74,6 +74,7 @@ class MainWindow:
             ("3. 분석", self.run_analysis),
             # ("4. 모델 학습", self.train_model),  # 구현 예정
         )
+
         for column, (label, action) in enumerate(buttons, start=3):
             ttk.Button(
                 toolbar,
@@ -152,7 +153,7 @@ class MainWindow:
         ttk.Combobox(
             controls,
             textvariable=self.chart_type_var,
-            values=("불량 분포", "히스토그램", "품질별 박스플롯", "상관관계"),
+            values=("불량 분포", "히스토그램", "품질별 박스플롯", "상관관계(heatmap)"),
             state="readonly",
             width=18,
         ).pack(side="left", padx=6)
@@ -203,11 +204,12 @@ class MainWindow:
             raise RuntimeError("먼저 CSV 데이터를 불러오세요.")
         processor = Preprocessor(self.raw_df)
         before_rows = len(processor.df)
-        processor.remove_duplicates()
+        processor.remove_duplicates() # 컬럼이 모두 중복되는 행 제거
         duplicate_count = before_rows - len(processor.df)
-        processor.convert_datetime("TimeStamp")
-        processor.fill_missing()
-        processor.encode_target()
+        processor.convert_datetime("TimeStamp") # TimeStamp 컬럼의 Type 을 문자열에서 날짜·시간 자료형으로 변환
+        processor.fill_missing() # 결측치를 중앙값으로, 현재 데이터셋에는 결측치가 없어서 아무 일도 안일어남
+        processor.encode_target() # 머신러닝을 수행하도록 숫자로 변경
+        # 모든 값이 동일한 수치형 컬럼을 제거
         removed_constants = processor.remove_constant_numeric_columns(
             exclude={"target", "PART_FACT_SERIAL"}
         )
@@ -226,7 +228,6 @@ class MainWindow:
         data = self._analysis_data()
         self.analyzer = DataAnalyzer(data)
         target_distribution = self.analyzer.get_class_distribution("PassOrFail")
-        missing = self.analyzer.get_missing_summary().query("missing_count > 0")
         product_defect = self.analyzer.get_group_summary(
             "PART_NAME", "target", ("count", "sum", "mean")
         )
@@ -242,8 +243,6 @@ class MainWindow:
                 "[제품별 불량 현황]",
                 product_defect.to_string(float_format=lambda value: f"{value:.4f}"),
                 "",
-                "[결측치가 있는 컬럼]",
-                missing.to_string() if not missing.empty else "없음",
             ]
         )
         self._set_text(self.analysis_text, report)
@@ -262,7 +261,7 @@ class MainWindow:
             figure = self.visualizer.plot_histogram(sensor)
         elif chart_type == "품질별 박스플롯":
             figure = self.visualizer.plot_boxplot(sensor, "PassOrFail")
-        elif chart_type == "상관관계":
+        elif chart_type == "상관관계(heatmap)":
             figure = self.visualizer.plot_correlation_heatmap()
         else:
             raise ValueError(f"지원하지 않는 그래프입니다: {chart_type}")

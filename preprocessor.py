@@ -10,7 +10,7 @@ class Preprocessor:
         return self.df.isna().sum()
 
     # select_dtypes(include="number")로 수치형(정수·실수) 컬럼만 추출 ->
-    # 각 수치형 컬럼의 결측치를 평균 대신 중앙값(median)으로 대체합니다.
+    # 각 수치형 컬럼의 결측치를 평균 대신 중앙값(median)으로 대체
     def fill_missing(self):
         numeric_cols = self.df.select_dtypes(
             include="number"
@@ -41,12 +41,12 @@ class Preprocessor:
 
         return self.df
     def remove_duplicates(self):
-        """모든 컬럼값이 동일한 완전 중복 행을 제거합니다."""
+        """모든 컬럼값이 동일한 완전 중복 행을 제거"""
         self.df = self.df.drop_duplicates().copy()
         return self.df
 
     def remove_constant_numeric_columns(self, exclude=None):
-        """값이 하나뿐인 수치형 센서 컬럼을 제거합니다."""
+        """값이 들어있지 않은 (0) 수치형 센서 컬럼을 제거"""
         exclude = set(exclude or [])
         numeric_cols = self.df.select_dtypes(include="number").columns
         constant_cols = [
@@ -58,12 +58,12 @@ class Preprocessor:
         return constant_cols
 
     def encode_target(self, source="PassOrFail", target="target"):
-        """Y/N 품질 판정을 0/1 머신러닝 타깃으로 변환합니다."""
+        """Y/N 품질 판정을 0/1 머신러닝 타깃으로 변환"""
         if source not in self.df.columns:
             raise KeyError(f"종속변수 컬럼이 없습니다: {source}")
         self.df[target] = self.df[source].map({"Y": 0, "N": 1})
         return self.df
 
     def get_data(self):
-        """현재 전처리 결과의 복사본을 반환합니다."""
+        """현재 전처리 결과의 복사본을 반환"""
         return self.df.copy()
