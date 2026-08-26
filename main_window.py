@@ -10,9 +10,8 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from data_analyzer import DataAnalyzer
 from data_loader import DataLoader
 from data_visualizer import DataVisualizer
-
-# from model_manager import ModelManager
-# from predictor import Predictor
+from model_manager import ModelManager
+from predictor import Predictor
 from preprocessor import Preprocessor
 
 
@@ -40,16 +39,17 @@ class MainWindow:
         self.clean_df: pd.DataFrame | None = None
         self.analyzer: DataAnalyzer | None = None
         self.visualizer: DataVisualizer | None = None
-        # 모델링 상태값은 구현 시 활성화
-        # self.model_manager: ModelManager | None = None
-        # self.predictor: Predictor | None = None
-        # self.model_features: list[str] = []
+        self.model_manager: ModelManager | None = None
+        self.predictor: Predictor | None = None
         self.chart_canvas: FigureCanvasTkAgg | None = None
+        self.model_chart_canvas: FigureCanvasTkAgg | None = None
 
         self.file_path_var = tk.StringVar(value=str(DEFAULT_DATA_PATH))
         self.cn7_rg3_only_var = tk.BooleanVar(value=True)
         self.chart_type_var = tk.StringVar(value="불량 분포")
         self.sensor_var = tk.StringVar(value="Injection_Time")
+        self.model_chart_type_var = tk.StringVar(value="모델별 성능 비교")
+        self.model_select_var = tk.StringVar(value="random_forest")
         self.status_var = tk.StringVar(value="CSV 파일을 불러오세요.")
         self._build_ui()
 
@@ -72,7 +72,7 @@ class MainWindow:
             ("1. 데이터 로드", self.load_data),
             ("2. 전처리", self.preprocess_data),
             ("3. 분석", self.run_analysis),
-            # ("4. 모델 학습", self.train_model),  # 구현 예정
+            ("4. 모델 학습", self.train_model),
         )
 
         for column, (label, action) in enumerate(buttons, start=3):
@@ -93,16 +93,16 @@ class MainWindow:
         self.preview_tab = ttk.Frame(self.notebook)
         self.analysis_tab = ttk.Frame(self.notebook)
         self.chart_tab = ttk.Frame(self.notebook)
-        # self.model_tab = ttk.Frame(self.notebook)
+        self.model_tab = ttk.Frame(self.notebook)
         self.notebook.add(self.preview_tab, text="데이터 미리보기")
         self.notebook.add(self.analysis_tab, text="분석 결과")
         self.notebook.add(self.chart_tab, text="시각화")
-        # self.notebook.add(self.model_tab, text="모델 및 예측")
+        self.notebook.add(self.model_tab, text="모델 및 예측")
 
         self._build_preview_tab()
         self._build_analysis_tab()
         self._build_chart_tab()
-        # self._build_model_tab()
+        self._build_model_tab()
         ttk.Label(
             self.root,
             textvariable=self.status_var,
@@ -172,6 +172,61 @@ class MainWindow:
         ).pack(side="left", padx=6)
         self.chart_frame = ttk.Frame(self.chart_tab)
         self.chart_frame.grid(row=1, column=0, sticky="nsew")
+
+    def _build_model_tab(self) -> None:
+        self.model_tab.columnconfigure(0, weight=1)
+        self.model_tab.columnconfigure(1, weight=1)
+        self.model_tab.rowconfigure(1, weight=1)
+
+        controls = ttk.Frame(self.model_tab, padding=8)
+        controls.grid(row=0, column=0, columnspan=2, sticky="ew")
+        ttk.Button(
+            controls,
+            text="모델 학습 & 비교",
+            command=lambda: self._run_ui_action(self.train_model),
+        ).pack(side="left", padx=(0, 6))
+        ttk.Button(
+            controls,
+            text="예측 실행",
+            command=lambda: self._run_ui_action(self.run_prediction),
+        ).pack(side="left", padx=(0, 12))
+
+        ttk.Label(controls, text="그래프").pack(side="left")
+        ttk.Combobox(
+            controls,
+            textvariable=self.model_chart_type_var,
+            values=("모델별 성능 비교", "혼동행렬", "ROC 커브", "피처 중요도"),
+            state="readonly",
+            width=16,
+        ).pack(side="left", padx=6)
+        ttk.Label(controls, text="모델(피처 중요도용)").pack(side="left", padx=(6, 0))
+        self.model_select_combo = ttk.Combobox(
+            controls,
+            textvariable=self.model_select_var,
+            state="readonly",
+            width=20,
+        )
+        self.model_select_combo.pack(side="left", padx=6)
+        ttk.Button(
+            controls,
+            text="그래프 표시",
+            command=lambda: self._run_ui_action(self.render_model_chart),
+        ).pack(side="left", padx=6)
+
+        text_frame = ttk.Frame(self.model_tab)
+        text_frame.grid(row=1, column=0, sticky="nsew")
+        text_frame.columnconfigure(0, weight=1)
+        text_frame.rowconfigure(0, weight=1)
+        self.model_text = tk.Text(text_frame, wrap="none", font=("Consolas", 10))
+        self.model_text.grid(row=0, column=0, sticky="nsew")
+        scroll = ttk.Scrollbar(
+            text_frame, orient="vertical", command=self.model_text.yview
+        )
+        scroll.grid(row=0, column=1, sticky="ns")
+        self.model_text.configure(yscrollcommand=scroll.set)
+
+        self.model_chart_frame = ttk.Frame(self.model_tab)
+        self.model_chart_frame.grid(row=1, column=1, sticky="nsew")
 
     def browse_file(self) -> None:
         selected = filedialog.askopenfilename(
@@ -265,12 +320,83 @@ class MainWindow:
             figure = self.visualizer.plot_correlation_heatmap()
         else:
             raise ValueError(f"지원하지 않는 그래프입니다: {chart_type}")
-        self._show_figure(figure)
+        self._show_figure(figure, self.chart_frame, "chart_canvas")
         self.notebook.select(self.chart_tab)
         self.status_var.set(f"시각화 완료: {chart_type}")
         return figure
 
-#----- AI 모델 구현해야함
+    def train_model(self) -> pd.DataFrame:
+        data = self.clean_df if self.clean_df is not None else self.preprocess_data()
+        self.model_manager = ModelManager(data)
+        self.model_manager.train_all()
+        comparison = self.model_manager.evaluate_all()
+        best_name = comparison.index[0]
+        best_metrics = self.model_manager.evaluate(best_name)
+        self.predictor = Predictor(
+            self.model_manager.models[best_name], self.model_manager.feature_columns
+        )
+        candidate_lines = [
+            f"- {name}: {reason}"
+            for name, reason in self.model_manager.CANDIDATE_REASONS.items()
+        ]
+        report = "\n".join(
+            [
+                "[후보 모델과 선택 이유]",
+                *candidate_lines,
+                "",
+                "[모델 성능 비교 (F1 기준 정렬)]",
+                comparison.to_string(float_format=lambda value: f"{value:.4f}"),
+                "",
+                f"[최고 모델 자동 선택] {self.model_manager.selection_reason()}",
+                "",
+                f"[{best_name} 상세 리포트]",
+                best_metrics["report"],
+                "[혼동행렬 (행=실제, 열=예측, 0=양품 1=불량)]",
+                str(best_metrics["confusion_matrix"]),
+            ]
+        )
+        self._set_text(self.model_text, report)
+        self.model_select_combo.configure(values=list(self.model_manager.models.keys()))
+        self.model_select_var.set(best_name)
+        self.notebook.select(self.model_tab)
+        self.status_var.set(
+            f"모델 학습 완료: 최고 모델 {best_name} (F1={best_metrics['f1']:.3f})"
+        )
+        return comparison
+
+    def render_model_chart(self):
+        if self.model_manager is None or not self.model_manager.models:
+            raise RuntimeError("먼저 모델을 학습하세요.")
+        chart_type = self.model_chart_type_var.get()
+        if chart_type == "모델별 성능 비교":
+            figure = self.model_manager.plot_model_comparison()
+        elif chart_type == "혼동행렬":
+            figure = self.model_manager.plot_confusion_matrices()
+        elif chart_type == "ROC 커브":
+            figure = self.model_manager.plot_roc_curves()
+        elif chart_type == "피처 중요도":
+            figure = self.model_manager.plot_feature_importance(self.model_select_var.get())
+        else:
+            raise ValueError(f"지원하지 않는 그래프입니다: {chart_type}")
+        self._show_figure(figure, self.model_chart_frame, "model_chart_canvas")
+        self.status_var.set(f"모델 그래프 표시: {chart_type}")
+        return figure
+
+    def run_prediction(self) -> pd.DataFrame:
+        if self.predictor is None:
+            raise RuntimeError("먼저 모델을 학습하세요.")
+        data = self._analysis_data()
+        predicted = self.predictor.predict_with_labels(data)
+        defect_count = int((predicted["predicted_target"] == 1).sum())
+        summary = (
+            f"\n[예측 결과] 총 {len(predicted):,}건 중 불량 예측 "
+            f"{defect_count:,}건 ({defect_count / len(predicted):.2%})"
+        )
+        self.model_text.insert("end", summary)
+        self._update_preview(predicted)
+        self.notebook.select(self.preview_tab)
+        self.status_var.set("예측 완료")
+        return predicted
 
     def _analysis_data(self) -> pd.DataFrame:
         if self.clean_df is not None:
@@ -302,12 +428,14 @@ class MainWindow:
         if numeric_columns and self.sensor_var.get() not in numeric_columns:
             self.sensor_var.set(numeric_columns[0])
 
-    def _show_figure(self, figure) -> None:
-        if self.chart_canvas is not None:
-            self.chart_canvas.get_tk_widget().destroy()
-        self.chart_canvas = FigureCanvasTkAgg(figure, master=self.chart_frame)
-        self.chart_canvas.draw()
-        self.chart_canvas.get_tk_widget().pack(fill="both", expand=True)
+    def _show_figure(self, figure, frame: ttk.Frame, canvas_attr: str) -> None:
+        existing_canvas = getattr(self, canvas_attr)
+        if existing_canvas is not None:
+            existing_canvas.get_tk_widget().destroy()
+        canvas = FigureCanvasTkAgg(figure, master=frame)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill="both", expand=True)
+        setattr(self, canvas_attr, canvas)
 
     @staticmethod
     def _set_text(widget: tk.Text, content: str) -> None:
