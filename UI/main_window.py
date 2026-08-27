@@ -715,6 +715,19 @@ class MainWindow:
         canvas.get_tk_widget().pack(fill="both", expand=True)
         setattr(self, canvas_attr, canvas)
 
+    @staticmethod
+    def _set_text(widget: tk.Text, content: str) -> None:
+        """텍스트 위젯의 내용을 새 문자열로 교체한다."""
+        previous_state = str(widget.cget("state"))
+        if previous_state == "disabled":
+            widget.configure(state="normal")
+
+        widget.delete("1.0", "end")
+        widget.insert("1.0", content)
+
+        if previous_state == "disabled":
+            widget.configure(state="disabled")
+
     def _run_ui_action(self, action) -> None:
         try:
             action()

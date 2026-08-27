@@ -26,7 +26,7 @@ class DynamicFaultCrawler:
         "https://search.naver.com/search.naver"
         "?where=web&query={query}&start={start}"
     )
-    RESULTS_PER_SEARCH_PAGE = 10
+    RESULTS_PER_SEARCH_PAGE = 3
     MAX_SEARCH_PAGES = 20
     RESULT_CONTAINER_SELECTOR = "#main_pack"
     RESULT_SELECTOR = "#main_pack a[href]"
