@@ -5,10 +5,11 @@ from __future__ import annotations
 import queue
 import threading
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import messagebox
 import webbrowser
 
 import pandas as pd
+import ttkbootstrap as ttk
 
 from Crawling.dynamic_fault_crawler import CrawlResult, DynamicFaultCrawler
 from .main_window import MainWindow
@@ -29,7 +30,13 @@ class CrawlerMainWindow(MainWindow):
         self.crawl_limit_var = tk.IntVar(value=10)
         self.crawl_headless_var = tk.BooleanVar(value=True)
         self.crawler_tab = ttk.Frame(self.notebook)
-        self.notebook.insert(2, self.crawler_tab, text="고장 원인 조사")
+        self.notebook.insert(
+            2,
+            self.crawler_tab,
+            text=" 고장 원인 조사",
+            image=self._make_tab_icon("crawler", self.style.colors.danger),
+            compound="left",
+        )
         self._build_crawler_tab()
 
     def load_data(self, file_path=None) -> pd.DataFrame:
@@ -41,8 +48,11 @@ class CrawlerMainWindow(MainWindow):
         self.crawler_tab.columnconfigure(1, weight=1)
         self.crawler_tab.rowconfigure(0, weight=1)
 
-        reason_frame = ttk.LabelFrame(
-            self.crawler_tab, text="1. 데이터의 고장 원인", padding=8
+        reason_frame = ttk.Labelframe(
+            self.crawler_tab,
+            text="1. 데이터의 고장 원인",
+            padding=8,
+            bootstyle="secondary",
         )
         reason_frame.grid(row=0, column=0, sticky="nsew", padx=(8, 4), pady=8)
         reason_frame.rowconfigure(1, weight=1)
@@ -68,7 +78,12 @@ class CrawlerMainWindow(MainWindow):
         content.rowconfigure(1, weight=2)
         content.rowconfigure(2, weight=3)
 
-        controls = ttk.LabelFrame(content, text="2. 동적 웹 크롤링", padding=8)
+        controls = ttk.Labelframe(
+            content,
+            text="2. 동적 웹 크롤링",
+            padding=8,
+            bootstyle="secondary",
+        )
         controls.grid(row=0, column=0, sticky="ew", pady=(0, 6))
         controls.columnconfigure(1, weight=1)
         ttk.Label(controls, text="선택 원인").grid(row=0, column=0, sticky="w")
@@ -84,14 +99,22 @@ class CrawlerMainWindow(MainWindow):
             controls, from_=1, to=10, textvariable=self.crawl_limit_var, width=5
         ).grid(row=1, column=3, padx=6, pady=(6, 0))
         ttk.Checkbutton(
-            controls, text="브라우저 숨김", variable=self.crawl_headless_var
+            controls,
+            text="브라우저 숨김",
+            variable=self.crawl_headless_var,
+            bootstyle="primary",
         ).grid(row=1, column=4, padx=6, pady=(6, 0))
         self.crawl_button = ttk.Button(
-            controls, text="3. 선택 원인 크롤링", command=self.start_fault_crawl
+            controls,
+            text="3. 선택 원인 크롤링",
+            command=self.start_fault_crawl,
+            bootstyle="danger",
         )
         self.crawl_button.grid(row=1, column=5, padx=(6, 0), pady=(6, 0))
 
-        result_frame = ttk.LabelFrame(content, text="검색 결과", padding=6)
+        result_frame = ttk.Labelframe(
+            content, text="검색 결과", padding=6, bootstyle="secondary"
+        )
         result_frame.grid(row=1, column=0, sticky="nsew")
         result_frame.columnconfigure(0, weight=1)
         result_frame.rowconfigure(0, weight=1)
@@ -114,7 +137,12 @@ class CrawlerMainWindow(MainWindow):
         self.crawl_result_tree.bind("<<TreeviewSelect>>", self._show_crawl_content)
         self.crawl_result_tree.bind("<Double-1>", self.open_selected_crawl_url)
 
-        preview_frame = ttk.LabelFrame(content, text="수집 본문 미리보기", padding=6)
+        preview_frame = ttk.Labelframe(
+            content,
+            text="수집 본문 미리보기",
+            padding=6,
+            bootstyle="secondary",
+        )
         preview_frame.grid(row=2, column=0, sticky="nsew", pady=(6, 0))
         preview_frame.columnconfigure(0, weight=1)
         preview_frame.rowconfigure(0, weight=1)
@@ -129,6 +157,7 @@ class CrawlerMainWindow(MainWindow):
             preview_frame,
             text="선택 문서 웹에서 열기",
             command=self.open_selected_crawl_url,
+            bootstyle="danger-outline",
         ).grid(row=1, column=0, sticky="e", pady=(6, 0))
 
     def _update_fault_reasons(self, df: pd.DataFrame) -> None:

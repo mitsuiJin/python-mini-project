@@ -7,6 +7,13 @@ import pandas as pd
 class DataAnalyzer:
     """전처리된 DataFrame의 요약 통계와 관계를 분석한"""
 
+    SENSOR_CATEGORY_RULES = (
+        ("Time", ("time",)),
+        ("속도", ("speed", "rpm")),
+        ("압력", ("pressure",)),
+        ("위치", ("position",)),
+        ("온도", ("temperature", "temp")),
+    )
     def __init__(self, df: pd.DataFrame):
         self.df = df.copy()
 
@@ -61,7 +68,7 @@ class DataAnalyzer:
         value_columns: Sequence[str] | None = None,
         exclude_columns: Sequence[str] = ("PART_FACT_SERIAL", "target"),
     ) -> pd.DataFrame:
-        """수치 지표별 평균·유효 건수·결측 건수를 반환한다."""
+        """수치 지표별 센서 특성·평균·유효 건수·결측 건수를 반환한다."""
         if value_columns is None:
             columns = self.df.select_dtypes(include="number").columns.tolist()
         else:
@@ -80,17 +87,22 @@ class DataAnalyzer:
 
         if not columns:
             return pd.DataFrame(
-                columns=["mean", "valid_count", "missing_count"],
+                columns=["category", "mean", "valid_count", "missing_count"],
                 index=pd.Index([], name="indicator"),
             )
 
         values = self.df[columns]
         summary = pd.DataFrame(
             {
+                "category": [
+                    self._get_sensor_category(column)
+                    for column in columns
+                ],
                 "mean": values.mean(),
                 "valid_count": values.count(),
                 "missing_count": values.isna().sum(),
-            }
+            },
+            index=columns,
         )
         summary.index.name = "indicator"
         return summary
@@ -117,6 +129,15 @@ class DataAnalyzer:
         counts = reasons.value_counts()
         counts.index.name = "fault_reason"
         return self._make_distribution(counts)
+
+    @classmethod
+    def _get_sensor_category(cls, column: str) -> str:
+        """컬럼 이름을 기준으로 센서의 공정 특성을 분류한다."""
+        normalized = str(column).strip().casefold()
+        for category, keywords in cls.SENSOR_CATEGORY_RULES:
+            if any(keyword in normalized for keyword in keywords):
+                return category
+        return "기타"
 
     @staticmethod
     def _make_distribution(counts: pd.Series) -> pd.DataFrame:
