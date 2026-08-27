@@ -22,30 +22,6 @@ class DataVisualizer:
         "압력": "#3B82F6",
         "위치": "#22C55E",
     }
-    SENSOR_CATEGORY_BACKGROUNDS = {
-        "Time": "#FFF7ED",
-        "속도": "#F5F3FF",
-        "압력": "#EFF6FF",
-        "위치": "#F0FDF4",
-    }
-    SENSOR_DISPLAY_NAMES = {
-        "Injection_Time": "Injection",
-        "Filling_Time": "Filling",
-        "Plasticizing_Time": "Plasticize",
-        "Cycle_Time": "Cycle",
-        "Clamp_Close_Time": "Clamp Close",
-        "Max_Injection_Speed": "Max Injection",
-        "Max_Screw_RPM": "Max Screw",
-        "Average_Screw_RPM": "Avg Screw",
-        "Max_Injection_Pressure": "Max Injection",
-        "Max_Switch_Over_Pressure": "Switch Over",
-        "Max_Back_Pressure": "Max Back",
-        "Average_Back_Pressure": "Avg Back",
-        "Cushion_Position": "Cushion",
-        "Switch_Over_Position": "Switch Over",
-        "Plasticizing_Position": "Plasticize",
-        "Clamp_Open_Position": "Clamp Open",
-    }
     def __init__(self, df: pd.DataFrame):
         self.df = df.copy()
 
@@ -107,18 +83,42 @@ class DataVisualizer:
         numeric_summary: pd.DataFrame,
         fault_distribution: pd.DataFrame,
     ) -> Figure:
-        """제품·품질·수치 평균·고장 원인을 2×2 대시보드로 표시한다."""
+        """왼쪽 특성별 평균과 오른쪽 품질·불량 현황을 표시한다."""
         figure = plt.figure(
-            figsize=(12.5, 6.4),
+            figsize=(13.5, 6.4),
             facecolor="#F4F7FB",
             constrained_layout=True,
         )
-        grid = figure.add_gridspec(2, 2, hspace=0.28, wspace=0.20)
-        product_axis = figure.add_subplot(grid[0, 0])
-        quality_axis = figure.add_subplot(grid[0, 1])
-        mean_axis = figure.add_subplot(grid[1, 0])
-        fault_axis = figure.add_subplot(grid[1, 1])
+        left_figure, right_figure = figure.subfigures(
+            1,
+            2,
+            width_ratios=(1.25, 1.0),
+            wspace=0.04,
+        )
+        left_figure.set_facecolor("#F4F7FB")
+        right_figure.set_facecolor("#F4F7FB")
+        left_figure.suptitle(
+            "특성별 주요 수치 평균",
+            x=0.01,
+            ha="left",
+            fontsize=13,
+            fontweight="bold",
+            color="#172033",
+        )
 
+        mean_axes = left_figure.subplots(2, 2)
+        right_grid = right_figure.add_gridspec(
+            2,
+            2,
+            height_ratios=(1.15, 1.0),
+            hspace=0.30,
+            wspace=0.20,
+        )
+        product_axis = right_figure.add_subplot(right_grid[0, 0])
+        quality_axis = right_figure.add_subplot(right_grid[0, 1])
+        fault_axis = right_figure.add_subplot(right_grid[1, :])
+
+        self._plot_numeric_means(mean_axes, numeric_summary)
         self._plot_dashboard_pie(
             product_axis,
             product_distribution,
@@ -126,10 +126,8 @@ class DataVisualizer:
             colors=("#2563EB", "#14B8A6"),
         )
         self._plot_quality_donut(quality_axis, quality_distribution)
-        self._plot_numeric_means(mean_axis, numeric_summary)
         self._plot_fault_reasons(fault_axis, fault_distribution)
         return figure
-
     @staticmethod
     def _plot_dashboard_pie(axis, distribution, title, colors) -> None:
         counts = distribution["count"].astype(float)
@@ -146,24 +144,17 @@ class DataVisualizer:
             colors=colors[:len(counts)],
             startangle=90,
             counterclock=False,
+            labels=[
+                f"{label}\n{int(count):,}건"
+                for label, count in zip(labels, counts)
+            ],
+            labeldistance=1.04,
             autopct="%1.1f%%",
-            pctdistance=0.70,
-            textprops={"fontsize": 9, "fontweight": "bold"},
+            pctdistance=0.68,
+            textprops={"fontsize": 7, "fontweight": "bold"},
             wedgeprops={"edgecolor": "white", "linewidth": 2},
         )
-        legend_labels = [
-            f"{label}  {int(count):,}건"
-            for label, count in zip(labels, counts)
-        ]
-        axis.legend(
-            wedges,
-            legend_labels,
-            loc="center left",
-            bbox_to_anchor=(0.86, 0.5),
-            frameon=False,
-            fontsize=9,
-        )
-        axis.set_title(title, loc="left", fontweight="bold", color="#172033")
+        axis.set_title(title, loc="left", fontsize=9, fontweight="bold", color="#172033")
 
     @staticmethod
     def _plot_quality_donut(axis, distribution) -> None:
@@ -182,9 +173,10 @@ class DataVisualizer:
             colors=colors,
             startangle=90,
             counterclock=False,
+
             autopct="%1.1f%%",
-            pctdistance=0.78,
-            textprops={"fontsize": 9, "fontweight": "bold"},
+            pctdistance=0.76,
+            textprops={"fontsize": 7, "fontweight": "bold"},
             wedgeprops={"width": 0.38, "edgecolor": "white", "linewidth": 2},
         )
         defect_rate = (
@@ -194,124 +186,97 @@ class DataVisualizer:
         )
         axis.text(
             0, 0, f"불량률\n{defect_rate:.2f}%",
-            ha="center", va="center", fontsize=12,
+            ha="center", va="center", fontsize=9,
             fontweight="bold", color="#172033",
         )
-        legend_labels = [
-            f"{label}  {int(count):,}건"
+        count_summary = " · ".join(
+            f"{label} {int(count):,}"
             for label, count in zip(labels, counts)
-        ]
-        axis.legend(
-            wedges,
-            legend_labels,
-            loc="center left",
-            bbox_to_anchor=(0.86, 0.5),
-            frameon=False,
-            fontsize=9,
         )
-        axis.set_title("양품 · 불량 비율", loc="left", fontweight="bold", color="#172033")
-
-    @classmethod
-    def _plot_numeric_means(cls, axis, numeric_summary) -> None:
-        """센서 평균을 특성별 열로 나눈 색상 표로 표시한다."""
-        axis.set_facecolor("white")
         axis.set_title(
-            "센서 특성별 주요 수치 평균",
+            f"양품 · 불량 비율\n{count_summary.replace(' · ', ' / ')}",
             loc="left",
+            fontsize=7,
             fontweight="bold",
             color="#172033",
         )
-        axis.axis("off")
 
+    @classmethod
+    def _plot_numeric_means(cls, axes, numeric_summary) -> None:
+        """Time·속도·압력·위치 평균을 독립 막대그래프로 표시한다."""
         required_columns = {"category", "mean"}
-        if numeric_summary.empty or not required_columns.issubset(
-            numeric_summary.columns
-        ):
-            axis.text(
-                0.5,
-                0.5,
-                "표시할 센서 평균이 없습니다.",
-                ha="center",
-                va="center",
-            )
-            return
+        axes = np.asarray(axes).reshape(-1)
 
-        category_rows = {}
-        for category in cls.SENSOR_CATEGORY_ORDER:
+        for axis, category in zip(axes, cls.SENSOR_CATEGORY_ORDER):
+            axis.set_facecolor("white")
+            axis.set_title(
+                category,
+                loc="left",
+                fontsize=10,
+                fontweight="bold",
+                color=cls.SENSOR_CATEGORY_COLORS[category],
+            )
+            if numeric_summary.empty or not required_columns.issubset(
+                numeric_summary.columns
+            ):
+                axis.text(
+                    0.5,
+                    0.5,
+                    "표시할 수치 평균이 없습니다.",
+                    ha="center",
+                    va="center",
+                    fontsize=8,
+                )
+                axis.axis("off")
+                continue
+
             rows = numeric_summary.loc[
                 numeric_summary["category"].eq(category),
                 ["mean"],
             ]
-            category_rows[category] = list(rows.itertuples())
-
-        maximum_sensors = max(
-            (len(rows) for rows in category_rows.values()),
-            default=0,
-        )
-        if maximum_sensors == 0:
-            axis.text(
-                0.5,
-                0.5,
-                "Time·속도·압력·위치 센서가 없습니다.",
-                ha="center",
-                va="center",
-            )
-            return
-
-        cell_text = []
-        for category in cls.SENSOR_CATEGORY_ORDER:
-            table_row = [category]
-            rows = category_rows[category]
-            for column_index in range(maximum_sensors):
-                if column_index >= len(rows):
-                    table_row.append("")
-                    continue
-                row = rows[column_index]
-                indicator = cls.SENSOR_DISPLAY_NAMES.get(
-                    str(row.Index),
-                    str(row.Index).replace("_", " "),
+            if rows.empty:
+                axis.text(
+                    0.5,
+                    0.5,
+                    "해당 특성 컬럼이 없습니다.",
+                    ha="center",
+                    va="center",
+                    fontsize=8,
                 )
-                table_row.append(f"{indicator}  {float(row.mean):,.2f}")
-            cell_text.append(table_row)
+                axis.axis("off")
+                continue
 
-        column_labels = ["특성"] + [
-            f"센서 {index}"
-            for index in range(1, maximum_sensors + 1)
-        ]
-        first_width = 0.13
-        sensor_width = (1.0 - first_width) / maximum_sensors
-        table = axis.table(
-            cellText=cell_text,
-            colLabels=column_labels,
-            colWidths=[first_width] + [sensor_width] * maximum_sensors,
-            cellLoc="center",
-            colLoc="center",
-            loc="center",
-            bbox=[0.0, 0.02, 1.0, 0.90],
-        )
-        table.auto_set_font_size(False)
-        table.set_fontsize(6.2)
+            means = rows["mean"].astype(float)
+            positions = np.arange(len(rows))
+            bars = axis.barh(
+                positions,
+                means,
+                color=cls.SENSOR_CATEGORY_COLORS[category],
+                height=0.58,
+                alpha=0.88,
+            )
+            axis.set_yticks(
+                positions,
+                rows.index.astype(str),
+                fontsize=6.5,
+            )
+            axis.invert_yaxis()
+            axis.tick_params(axis="x", labelsize=6.5)
+            axis.grid(axis="x", alpha=0.18)
+            axis.spines["top"].set_visible(False)
+            axis.spines["right"].set_visible(False)
 
-        for column_index in range(maximum_sensors + 1):
-            header = table[(0, column_index)]
-            header.set_facecolor("#475569")
-            header.set_edgecolor("white")
-            header.get_text().set_color("white")
-            header.get_text().set_fontweight("bold")
-
-        for row_index, category in enumerate(cls.SENSOR_CATEGORY_ORDER, start=1):
-            category_cell = table[(row_index, 0)]
-            category_cell.set_facecolor(cls.SENSOR_CATEGORY_COLORS[category])
-            category_cell.set_edgecolor("white")
-            category_cell.get_text().set_color("white")
-            category_cell.get_text().set_fontweight("bold")
-            for column_index in range(1, maximum_sensors + 1):
-                cell = table[(row_index, column_index)]
-                cell.set_facecolor(cls.SENSOR_CATEGORY_BACKGROUNDS[category])
-                cell.set_edgecolor("white")
-                cell.get_text().set_color("#172033")
-
-
+            maximum = float(means.abs().max())
+            axis.set_xlim(0, maximum * 1.30 if maximum else 1)
+            for bar, value in zip(bars, means):
+                axis.text(
+                    bar.get_width() + maximum * 0.025,
+                    bar.get_y() + bar.get_height() / 2,
+                    f"{value:,.2f}",
+                    va="center",
+                    fontsize=6.5,
+                    color="#172033",
+                )
     @staticmethod
     def _plot_fault_reasons(axis, distribution) -> None:
         axis.set_facecolor("white")

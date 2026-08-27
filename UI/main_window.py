@@ -330,7 +330,7 @@ class MainWindow:
             state="readonly",
             width=18,
         ).pack(side="left", padx=6)
-        ttk.Label(controls, text="센서").pack(side="left", padx=(12, 0))
+        ttk.Label(controls, text="컬럼").pack(side="left", padx=(12, 0))
         self.sensor_combo = ttk.Combobox(
             controls,
             textvariable=self.sensor_var,
@@ -443,7 +443,7 @@ class MainWindow:
         self._update_sensor_columns(self.clean_df)
         self.status_var.set(
             f"전처리 완료: 중복 {duplicate_count:,}행 제거, "
-            f"상수 센서 {len(removed_constants)}개 제거"
+            f"상수 컬럼 {len(removed_constants)}개 제거"
         )
         return self.clean_df
 
