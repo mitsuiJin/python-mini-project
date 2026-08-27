@@ -17,7 +17,7 @@ graph LR
     E --> G[DataVisualizer]
     E --> H[ModelManager]
 
-    F --> I[통계 분석 결과]
+    F --> I[통계 대시보드]
     G --> J[그래프]
 
     H --> K[분류/회귀 모델]
@@ -47,8 +47,46 @@ graph LR
 ## 분석할 데이터
 labeled_data.csv
 
+## 폴더 구조
+```mermaid
+graph TD
+    Root["📁 Root Project"]
+    
+    %% Analyze Group
+    subgraph Analyze ["📁 Analyze (데이터 분석/처리)"]
+        A0["__init__.py"]
+        A1["data_analyzer.py"]
+        A2["data_loader.py"]
+        A3["data_visualizer.py"]
+        A4["preprocessor.py"]
+    end
+
+    %% Crawling Group
+    subgraph Crawling ["📁 Crawling (웹 수집)"]
+        C0["__init__.py"]
+        C1["dynamic_fault_crawler.py"]
+    end
+
+    %% ML Group
+    subgraph ML ["📁 ML (머신러닝 파이프라인)"]
+        M0["__init__.py"]
+        M1["model_manager.py"]
+        M2["predictor.py"]
+    end
+
+    %% UI Group
+    subgraph UI ["📁 UI (사용자 인터페이스)"]
+        U0["__init__.py"]
+        U1["crawler_window.py"]
+        U2["main_window.py"]
+    end
+
+    Root --> Analyze
+    Root --> Crawling
+    Root --> ML
+    Root --> UI
+```
+
 ## 해야하는 것
 
-1. UI 대시보드 추가
 2. UI 이쁘게 만들기
-3. 각 기능 문서화

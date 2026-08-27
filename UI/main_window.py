@@ -43,6 +43,8 @@ class MainWindow:
         self.predictor: Predictor | None = None
         self.chart_canvas: FigureCanvasTkAgg | None = None
         self.model_chart_canvas: FigureCanvasTkAgg | None = None
+        self.analysis_chart_canvas: FigureCanvasTkAgg | None = None
+        self.dashboard_kpi_vars: dict[str, tuple[tk.StringVar, tk.StringVar]] = {}
 
         self.file_path_var = tk.StringVar(value=str(DEFAULT_DATA_PATH))
         self.cn7_rg3_only_var = tk.BooleanVar(value=True)
@@ -95,7 +97,7 @@ class MainWindow:
         self.chart_tab = ttk.Frame(self.notebook)
         self.model_tab = ttk.Frame(self.notebook)
         self.notebook.add(self.preview_tab, text="데이터 미리보기")
-        self.notebook.add(self.analysis_tab, text="분석 결과")
+        self.notebook.add(self.analysis_tab, text="분석 대시보드")
         self.notebook.add(self.chart_tab, text="시각화")
         self.notebook.add(self.model_tab, text="모델 및 예측")
 
@@ -131,18 +133,89 @@ class MainWindow:
 
     def _build_analysis_tab(self) -> None:
         self.analysis_tab.columnconfigure(0, weight=1)
-        self.analysis_tab.rowconfigure(0, weight=1)
-        self.analysis_text = tk.Text(
-            self.analysis_tab, wrap="none", font=("Consolas", 10)
+        self.analysis_tab.rowconfigure(2, weight=1)
+
+        header = tk.Frame(self.analysis_tab, bg="#172033", padx=18, pady=12)
+        header.grid(row=0, column=0, sticky="ew")
+        tk.Label(
+            header,
+            text="CN7 · RG3 제조 품질 대시보드",
+            bg="#172033",
+            fg="white",
+            font=("Malgun Gothic", 16, "bold"),
+            anchor="w",
+        ).pack(fill="x")
+        tk.Label(
+            header,
+            text="전처리 완료 데이터를 기준으로 제품 구성, 품질, 공정 평균과 고장 원인을 요약합니다.",
+            bg="#172033",
+            fg="#CBD5E1",
+            font=("Malgun Gothic", 9),
+            anchor="w",
+        ).pack(fill="x", pady=(3, 0))
+
+        kpi_frame = tk.Frame(self.analysis_tab, bg="#F4F7FB", padx=10, pady=10)
+        kpi_frame.grid(row=1, column=0, sticky="ew")
+        kpi_specs = (
+            ("total", "전체 데이터", "#475569"),
+            ("cn7", "CN7 비율", "#2563EB"),
+            ("rg3", "RG3 비율", "#14B8A6"),
+            ("defect", "전체 불량률", "#EF4444"),
         )
-        self.analysis_text.grid(row=0, column=0, sticky="nsew")
-        scroll = ttk.Scrollbar(
+        for column, (key, title, accent) in enumerate(kpi_specs):
+            kpi_frame.columnconfigure(column, weight=1, uniform="dashboard_kpi")
+            card = tk.Frame(
+                kpi_frame,
+                bg="white",
+                highlightbackground="#DCE3ED",
+                highlightthickness=1,
+                padx=14,
+                pady=9,
+            )
+            card.grid(
+                row=0,
+                column=column,
+                sticky="nsew",
+                padx=(0 if column == 0 else 5, 0 if column == 3 else 5),
+            )
+            title_row = tk.Frame(card, bg="white")
+            title_row.pack(fill="x")
+            tk.Frame(title_row, bg=accent, width=5, height=18).pack(side="left")
+            tk.Label(
+                title_row,
+                text=title,
+                bg="white",
+                fg="#64748B",
+                font=("Malgun Gothic", 9, "bold"),
+            ).pack(side="left", padx=(7, 0))
+
+            value_var = tk.StringVar(value="—")
+            detail_var = tk.StringVar(value="분석 버튼을 눌러주세요.")
+            tk.Label(
+                card,
+                textvariable=value_var,
+                bg="white",
+                fg="#172033",
+                font=("Malgun Gothic", 18, "bold"),
+                anchor="w",
+            ).pack(fill="x", pady=(5, 0))
+            tk.Label(
+                card,
+                textvariable=detail_var,
+                bg="white",
+                fg="#64748B",
+                font=("Malgun Gothic", 8),
+                anchor="w",
+            ).pack(fill="x")
+            self.dashboard_kpi_vars[key] = (value_var, detail_var)
+
+        self.dashboard_chart_frame = tk.Frame(
             self.analysis_tab,
-            orient="vertical",
-            command=self.analysis_text.yview,
+            bg="#F4F7FB",
+            padx=8,
+            pady=0,
         )
-        scroll.grid(row=0, column=1, sticky="ns")
-        self.analysis_text.configure(yscrollcommand=scroll.set)
+        self.dashboard_chart_frame.grid(row=2, column=0, sticky="nsew", pady=(0, 8))
 
     def _build_chart_tab(self) -> None:
         self.chart_tab.columnconfigure(0, weight=1)
@@ -280,29 +353,80 @@ class MainWindow:
         return self.clean_df
 
     def run_analysis(self) -> str:
+        """전처리 데이터 집계값으로 분석 대시보드를 갱신한다."""
         data = self._analysis_data()
+        self.status_var.set("분석 대시보드를 생성하고 있습니다...")
         self.analyzer = DataAnalyzer(data)
-        target_distribution = self.analyzer.get_class_distribution("PassOrFail")
-        product_defect = self.analyzer.get_group_summary(
-            "PART_NAME", "target", ("count", "sum", "mean")
+        product_distribution = self.analyzer.get_product_distribution()
+        quality_distribution = self.analyzer.get_quality_distribution()
+        numeric_summary = self.analyzer.get_numeric_mean_summary()
+        fault_distribution = self.analyzer.get_fault_reason_distribution()
+
+        total_count = len(data)
+        cn7_count = int(product_distribution.loc["CN7", "count"])
+        cn7_percentage = float(product_distribution.loc["CN7", "percentage"])
+        rg3_count = int(product_distribution.loc["RG3", "count"])
+        rg3_percentage = float(product_distribution.loc["RG3", "percentage"])
+        defect_count = int(quality_distribution.loc["불량", "count"])
+        defect_percentage = float(
+            quality_distribution.loc["불량", "percentage"]
         )
-        product_defect.columns = ["생산수", "불량수", "불량률"]
+
+        kpi_values = {
+            "total": (f"{total_count:,}건", f"{data.shape[1]:,}개 컬럼"),
+            "cn7": (f"{cn7_percentage:.2f}%", f"{cn7_count:,}건"),
+            "rg3": (f"{rg3_percentage:.2f}%", f"{rg3_count:,}건"),
+            "defect": (
+                f"{defect_percentage:.2f}%",
+                f"불량 {defect_count:,}건",
+            ),
+        }
+        for key, (value, detail) in kpi_values.items():
+            value_var, detail_var = self.dashboard_kpi_vars[key]
+            value_var.set(value)
+            detail_var.set(detail)
+
+        self.visualizer = DataVisualizer(data)
+        dashboard_figure = self.visualizer.plot_dashboard(
+            product_distribution=product_distribution,
+            quality_distribution=quality_distribution,
+            numeric_summary=numeric_summary,
+            fault_distribution=fault_distribution,
+        )
+        self._show_figure(
+            dashboard_figure,
+            self.dashboard_chart_frame,
+            "analysis_chart_canvas",
+        )
+
         report = "\n".join(
             [
-                "[데이터 크기]",
-                str(data.shape),
+                "[제품 비율]",
+                product_distribution.to_string(
+                    float_format=lambda value: f"{value:.2f}"
+                ),
                 "",
-                "[양품/불량 분포]",
-                target_distribution.to_string(),
+                "[양품/불량 비율]",
+                quality_distribution.to_string(
+                    float_format=lambda value: f"{value:.2f}"
+                ),
                 "",
-                "[제품별 불량 현황]",
-                product_defect.to_string(float_format=lambda value: f"{value:.4f}"),
+                "[수치 지표 평균]",
+                numeric_summary.to_string(
+                    float_format=lambda value: f"{value:.2f}"
+                ),
                 "",
+                "[고장 원인]",
+                fault_distribution.to_string(
+                    float_format=lambda value: f"{value:.2f}"
+                ),
             ]
         )
-        self._set_text(self.analysis_text, report)
         self.notebook.select(self.analysis_tab)
-        self.status_var.set("기초 분석 완료")
+        self.status_var.set(
+            f"대시보드 분석 완료: {total_count:,}건 · 불량률 "
+            f"{defect_percentage:.2f}%"
+        )
         return report
 
     def render_selected_chart(self):
