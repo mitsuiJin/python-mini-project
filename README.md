@@ -3,6 +3,8 @@
 
 ## 실행방법
 
+모델 학습·평가는 `scripts/run_semi_supervised.py`로 실행한다. 자세한 사용법과 배경은 [ML/README.md](ML/README.md) 참고.
+
 ## 페이지 설명 (기능, 함수, 클래스 별로)
 
 ## Architecture
@@ -18,21 +20,18 @@ graph LR
 
     E --> F[DataAnalyzer]
     E --> G[DataVisualizer]
-    E --> H[ModelManager]
 
     F --> I[통계 대시보드]
     G --> J[그래프]
 
-    H --> K[분류/회귀 모델]
-
-    K --> L[Predictor]
-    E --> L
-
-    L --> M[불량 예측<br/>품질 수치 예측]
+    R["moldset_labeled/unlabeled_{product}.csv"] --> S[ML.dataset]
+    S --> T["ML.evaluation (5-fold CV)"]
+    T --> U["GaussianNB / RandomForest / SVM"]
+    U --> V[모델 비교 그래프·혼동행렬]
 
     I --> N[MainWindow]
     J --> N
-    M --> N
+    V --> N
 
 
 
@@ -44,7 +43,7 @@ graph LR
     classDef pythonClass color:#0066ff;
 
     %% 클래스 지정
-    class B,D,F,G,H,L,N,Q,P pythonClass;
+    class B,D,F,G,S,T,U,N,Q,P pythonClass;
   
 ```
 
@@ -55,9 +54,12 @@ graph LR
   - [Preprocessor](Analyze/preprocessor.py) : CSV 데이터를 학습하기 위해서 전처리하는 모듈
   - [DataAnalyzer](Analyze/data_analyzer.py) : 전처리 된 데이터의 주요 지표를 분석하는 모듈
   - [DataVisualizer](Analyze/data_visualizer.py) : 데이터 값을 시각화 하는 모듈
-- 머신 러닝
-  - [ModelManager](ML/model_manager.py) : 머신러닝 모델 학습
-  - [Predictor](ML/predictor.py) : 학습된 머신러닝 모델 우리 데이터에 적용
+- 머신 러닝 (자세한 내용은 [ML/README.md](ML/README.md) 참고)
+  - [dataset](ML/dataset.py) : CN7/RG3 라벨·비라벨 데이터 로드
+  - [models](ML/models.py) : GaussianNB/RandomForest/SVM 기본 하이퍼파라미터·생성 함수
+  - [semi_supervised](ML/semi_supervised.py) : pseudo-labeling(의사라벨) 학습 로직
+  - [evaluation](ML/evaluation.py) : 5-fold 교차검증 평가 하네스
+  - [hyperparameter_search](ML/hyperparameter_search.py) : GridSearchCV 하이퍼파라미터 탐색
 - UI
   - [MainWindow](UI/main_window.py) : 크롤링을 포함하지 않는 UI 
   - [CrawlerWindow](UI/crawler_window.py) : 크롤링 포함 UI
@@ -99,9 +101,9 @@ get_fault_reason_distribution() : 고장 원인 분석
 - `def plot_correlation_heatmap(self) -> Figure`
   - 히트맵 : 어떤 수치형 변수끼리 같이 움직이는가 확인
 ---
-### [ModelManager](ML/model_manager.py)
+### ML 파이프라인
 
-### [Predictor](ML/predictor.py)
+CN7/RG3 불량 예측 모델의 구성·시행착오·최종 결과는 [ML/README.md](ML/README.md)에 정리되어 있다.
 
 ---
 
@@ -139,8 +141,11 @@ graph TD
     %% ML Group
     subgraph ML ["📁 ML (머신러닝 파이프라인)"]
         M0["__init__.py"]
-        M1["model_manager.py"]
-        M2["predictor.py"]
+        M1["dataset.py"]
+        M2["models.py"]
+        M3["semi_supervised.py"]
+        M4["evaluation.py"]
+        M5["hyperparameter_search.py"]
     end
 
     %% UI Group
@@ -150,9 +155,15 @@ graph TD
         U2["main_window.py"]
     end
 
+    %% Scripts Group
+    subgraph Scripts ["📁 scripts (실행 스크립트)"]
+        SC0["run_semi_supervised.py"]
+    end
+
     Root --> Analyze
     Root --> Crawling
     Root --> ML
     Root --> UI
+    Root --> Scripts
 ```
 
