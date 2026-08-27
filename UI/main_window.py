@@ -618,8 +618,11 @@ class MainWindow:
     ):
         """모델별 성능 비교 막대그래프 + 모델별 혼동행렬 히트맵을 한 이미지로 구성."""
         model_count = len(results)
-        figure = plt.figure(figsize=(11, 7.5))
-        grid = figure.add_gridspec(2, model_count, height_ratios=[1.15, 1])
+        # constrained_layout: Tkinter 창 크기에 맞춰 그래프가 다시 그려질 때마다
+        # 여백을 재계산해준다. tight_layout()은 최초 1회만 계산돼서 창 크기가
+        # 바뀌면(=모델 탭이 좁을 때) 글자가 겹치는 문제가 있었다.
+        figure = plt.figure(figsize=(11, 7.5), constrained_layout=True)
+        grid = figure.add_gridspec(2, model_count, height_ratios=[1.15, 1], hspace=0.3)
 
         metric_colors = {
             "precision": "#2563EB",
@@ -673,7 +676,6 @@ class MainWindow:
             axis.set_yticks([0, 1], ["실제 양품", "실제 불량"], fontsize=8)
             axis.set_title(name, fontsize=10)
 
-        figure.tight_layout()
         return figure
 
     def _analysis_data(self) -> pd.DataFrame:
