@@ -4,7 +4,9 @@
 
 ## 실행방법
 
-- main_crawler.py 실행
+- `python main.py` : 분석 UI 실행
+- `python main_crawler.py` : 고장 원인 크롤링이 포함된 UI 실행
+- 모델 학습·평가는 `scripts/run_semi_supervised.py`로 실행한다. 자세한 사용법과 배경은 [ML/README.md](ML/README.md) 참고.
 
 ## 페이지 설명 (기능, 함수, 클래스 별로)
 
@@ -21,21 +23,18 @@ graph LR
 
     E --> F[DataAnalyzer]
     E --> G[DataVisualizer]
-    E --> H[ModelManager]
 
     F --> I[통계 대시보드]
     G --> J[그래프]
 
-    H --> K[분류/회귀 모델]
-
-    K --> L[Predictor]
-    E --> L
-
-    L --> M[불량 예측<br/>품질 수치 예측]
+    R["moldset_labeled/unlabeled_{product}.csv"] --> S[ML.dataset]
+    S --> T["ML.evaluation (5-fold CV)"]
+    T --> U["GaussianNB / RandomForest / SVM"]
+    U --> V[모델 비교 그래프·혼동행렬]
 
     I --> N[MainWindow]
     J --> N
-    M --> N
+    V --> N
 
 
 
@@ -47,7 +46,7 @@ graph LR
     classDef pythonClass color:#0066ff;
 
     %% 클래스 지정
-    class B,D,F,G,H,L,N,Q,P pythonClass;
+    class B,D,F,G,S,T,U,N,Q,P pythonClass;
   
 ```
 
@@ -58,9 +57,12 @@ graph LR
   - [Preprocessor](Analyze/preprocessor.py) : CSV 데이터를 학습하기 위해서 전처리하는 모듈
   - [DataAnalyzer](Analyze/data_analyzer.py) : 전처리 된 데이터의 주요 지표를 분석하는 모듈
   - [DataVisualizer](Analyze/data_visualizer.py) : 데이터 값을 시각화 하는 모듈
-- 머신 러닝
-  - [ModelManager](ML/model_manager.py) : 머신러닝 모델 학습
-  - [Predictor](ML/predictor.py) : 학습된 머신러닝 모델 우리 데이터에 적용
+- 머신 러닝 (자세한 내용은 [ML/README.md](ML/README.md) 참고)
+  - [dataset](ML/dataset.py) : CN7/RG3 라벨·비라벨 데이터 로드
+  - [models](ML/models.py) : GaussianNB/RandomForest/SVM 기본 하이퍼파라미터·생성 함수
+  - [semi_supervised](ML/semi_supervised.py) : pseudo-labeling(의사라벨) 학습 로직
+  - [evaluation](ML/evaluation.py) : 5-fold 교차검증 평가 하네스
+  - [hyperparameter_search](ML/hyperparameter_search.py) : GridSearchCV 하이퍼파라미터 탐색
 - UI
   - [MainWindow](UI/main_window.py) : 크롤링을 포함하지 않는 UI 
   - [CrawlerWindow](UI/crawler_window.py) : 크롤링 포함 UI
@@ -102,9 +104,9 @@ get_fault_reason_distribution() : 고장 원인 분석
 - `def plot_correlation_heatmap(self) -> Figure`
   - 히트맵 : 어떤 수치형 변수끼리 같이 움직이는가 확인
 ---
-### [ModelManager](ML/model_manager.py)
+### ML 파이프라인
 
-### [Predictor](ML/predictor.py)
+CN7/RG3 불량 예측 모델의 구성·시행착오·최종 결과는 [ML/README.md](ML/README.md)에 정리되어 있다.
 
 ---
 
@@ -137,9 +139,11 @@ run_analysis() : 제품 비율, 품질 분포, 수치 평균 및 고장 원인�
 
 render_selected_chart() : 선택한 그래프 종류와 센서에 맞는 시각화 생성
 
-run_model_evaluation() : 제품별 머신러닝 모델의 5-fold 교차검증과 성능 평가 실행
+run_model_evaluation() : 제품별 머신러닝 모델의 5-fold 교차검증 실행, KPI 카드 갱신 및 결과 그래프 표시
 
-render_model_chart() : 모델별 Precision, Recall, F1, ROC-AUC 성능 비교 그래프 생성
+_build_model_result_figure(product, comparison, results) : 모델별 성능 비교 막대그래프와 혼동행렬 히트맵을 하나의 이미지로 구성
+
+_build_kpi_row(parent, specs, ...) : 제목/강조색이 있는 카드형 KPI 위젯 여러 개를 한 행에 배치 (분석 대시보드·모델 탭 공용)
 
 _analysis_data() : 분석에 사용할 전처리 데이터 또는 임시 분석 데이터 반환
 
@@ -148,8 +152,6 @@ _update_preview(df) : DataFrame의 컬럼과 상위 100행을 미리보기 표�
 _update_sensor_columns(df) : 수치형 컬럼을 추출하여 시각화용 센서 목록 갱신
 
 _show_figure(figure, frame, canvas_attr) : Matplotlib 그래프를 Tkinter 화면에 표시
-
-_set_text(widget, content) : Text 위젯의 기존 내용을 지우고 새로운 내용 입력
 
 _run_ui_action(action) : UI 기능을 실행하고 발생한 오류를 팝업으로 표시
 
@@ -298,8 +300,11 @@ graph TD
     %% ML Group
     subgraph ML ["📁 ML (머신러닝 파이프라인)"]
         M0["__init__.py"]
-        M1["model_manager.py"]
-        M2["predictor.py"]
+        M1["dataset.py"]
+        M2["models.py"]
+        M3["semi_supervised.py"]
+        M4["evaluation.py"]
+        M5["hyperparameter_search.py"]
     end
 
     %% UI Group
@@ -309,9 +314,15 @@ graph TD
         U2["main_window.py"]
     end
 
+    %% Scripts Group
+    subgraph Scripts ["📁 scripts (실행 스크립트)"]
+        SC0["run_semi_supervised.py"]
+    end
+
     Root --> Analyze
     Root --> Crawling
     Root --> ML
     Root --> UI
+    Root --> Scripts
 ```
 
