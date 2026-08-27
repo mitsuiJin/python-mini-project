@@ -48,3 +48,7 @@ graph LR
 labeled_data.csv
 
 ## 해야하는 것
+
+1. UI 대시보드 추가
+2. UI 이쁘게 만들기
+3. 각 기능 문서화

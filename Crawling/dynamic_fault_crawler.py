@@ -22,7 +22,12 @@ class CrawlResult:
 class DynamicFaultCrawler:
     """Selenium으로 렌더링하고 BeautifulSoup으로 관련 한국어 문서를 선별한다."""
 
-    SEARCH_URL = "https://search.naver.com/search.naver?where=web&query={query}"
+    SEARCH_URL = (
+        "https://search.naver.com/search.naver"
+        "?where=web&query={query}&start={start}"
+    )
+    RESULTS_PER_SEARCH_PAGE = 10
+    MAX_SEARCH_PAGES = 20
     RESULT_CONTAINER_SELECTOR = "#main_pack"
     RESULT_SELECTOR = "#main_pack a[href]"
     BLOCKED_RESULT_HOSTS = {
@@ -70,7 +75,11 @@ class DynamicFaultCrawler:
         progress: Callable[[str], None] | None = None,
         required_reason: str | None = None,
     ) -> list[CrawlResult]:
-        """네이버 검색 결과 중 모든 필터를 통과한 한국어 문서만 반환한다."""
+        """요청 개수만큼 필터를 통과한 한국어 문서를 반환한다.
+
+        최대 검색 범위 안에서 개수를 채우지 못하면 부분 결과를 반환하지 않고
+        RuntimeError를 발생시킨다.
+        """
         query = self.normalize_text(query)
         if not query:
             raise ValueError("검색어를 입력하세요.")
@@ -95,60 +104,107 @@ class DynamicFaultCrawler:
         driver = webdriver.Chrome(options=options)
         driver.set_page_load_timeout(self.timeout)
         results: list[CrawlResult] = []
+        examined_count = 0
+        seen_urls: set[str] = set()
+        consecutive_empty_pages = 0
         try:
-            search_url = self.SEARCH_URL.format(query=quote_plus(query))
-            self._notify(progress, f"네이버 검색 중: {query}")
-            driver.get(search_url)
-            wait(driver, self.timeout).until(
-                expected_conditions.presence_of_element_located(
-                    (by.CSS_SELECTOR, self.RESULT_CONTAINER_SELECTOR)
-                )
-            )
-
-            search_links = self.extract_search_links(driver.page_source)
-            candidate_limit = min(max_pages * 5, 30)
-            candidates = self._unique_links(search_links)[:candidate_limit]
-
-            for index, (url, search_title) in enumerate(candidates, start=1):
+            for search_page in range(1, self.MAX_SEARCH_PAGES + 1):
+                start = (search_page - 1) * self.RESULTS_PER_SEARCH_PAGE + 1
+                search_url = self.build_search_url(query, start)
                 self._notify(
                     progress,
-                    f"한국어·관련성 확인 중 ({index}/{len(candidates)}): {search_title}",
+                    f"네이버 검색 결과 {search_page}페이지 확인 중 "
+                    f"(수집 {len(results)}/{max_pages}건)",
                 )
-                try:
-                    driver.get(url)
-                    wait(driver, self.timeout).until(
-                        expected_conditions.presence_of_element_located(
-                            (by.TAG_NAME, "body")
+                driver.get(search_url)
+                wait(driver, self.timeout).until(
+                    expected_conditions.presence_of_element_located(
+                        (by.CSS_SELECTOR, self.RESULT_CONTAINER_SELECTOR)
+                    )
+                )
+
+                page_candidates = [
+                    candidate
+                    for candidate in self._unique_links(
+                        self.extract_search_links(driver.page_source)
+                    )
+                    if candidate[0] not in seen_urls
+                ]
+                if not page_candidates:
+                    consecutive_empty_pages += 1
+                    if consecutive_empty_pages >= 2:
+                        break
+                    continue
+                consecutive_empty_pages = 0
+
+                for url, search_title in page_candidates:
+                    seen_urls.add(url)
+                    examined_count += 1
+                    self._notify(
+                        progress,
+                        f"한국어·관련성 확인 중 "
+                        f"(후보 {examined_count}, 수집 {len(results)}/{max_pages}): "
+                        f"{search_title}",
+                    )
+                    try:
+                        driver.get(url)
+                        wait(driver, self.timeout).until(
+                            expected_conditions.presence_of_element_located(
+                                (by.TAG_NAME, "body")
+                            )
                         )
-                    )
-                    title, content = self.parse_document(
-                        driver.page_source,
-                        fallback_title=driver.title or search_title,
-                    )
-                    relevant, failures = self.evaluate_relevance(
-                        title=title or search_title,
-                        content=content,
-                        reason=reason,
-                    )
-                    if not relevant:
+                        title, content = self.parse_document(
+                            driver.page_source,
+                            fallback_title=driver.title or search_title,
+                        )
+                        relevant, failures = self.evaluate_relevance(
+                            title=title or search_title,
+                            content=content,
+                            reason=reason,
+                        )
+                        if not relevant:
+                            self._notify(
+                                progress,
+                                f"수집 제외 ({', '.join(failures)}): "
+                                f"{title or search_title}",
+                            )
+                            continue
+
+                        results.append(CrawlResult(
+                            title=title or search_title or url,
+                            url=driver.current_url,
+                            content=content[:self.max_content_chars],
+                        ))
                         self._notify(
                             progress,
-                            f"수집 제외 ({', '.join(failures)}): {title or search_title}",
+                            f"문서 수집 완료 ({len(results)}/{max_pages}): "
+                            f"{title or search_title}",
                         )
-                        continue
+                        if len(results) == max_pages:
+                            break
+                    except Exception as error:
+                        self._notify(progress, f"문서 건너뜀: {type(error).__name__}")
 
-                    results.append(CrawlResult(
-                        title=title or search_title or url,
-                        url=driver.current_url,
-                        content=content[:self.max_content_chars],
-                    ))
-                    if len(results) >= max_pages:
-                        break
-                except Exception as error:
-                    self._notify(progress, f"문서 건너뜀: {type(error).__name__}")
+                if len(results) == max_pages:
+                    break
         finally:
             driver.quit()
+
+        if len(results) != max_pages:
+            raise RuntimeError(
+                f"요청한 문서 {max_pages}건 중 {len(results)}건만 조건을 "
+                f"통과했습니다. 네이버 검색 결과 최대 {self.MAX_SEARCH_PAGES}페이지와 "
+                f"후보 {examined_count}건을 확인했지만 관련 한국어 제조 문서가 "
+                "부족합니다. 검색어 또는 관련성 필터를 조정하세요."
+            )
         return results
+
+    @classmethod
+    def build_search_url(cls, query: str, start: int = 1) -> str:
+        """검색 시작 위치를 포함한 네이버 웹 검색 URL을 만든다."""
+        if start < 1:
+            raise ValueError("검색 시작 위치는 1 이상이어야 합니다.")
+        return cls.SEARCH_URL.format(query=quote_plus(query), start=start)
 
     @staticmethod
     def normalize_text(value: str | None) -> str:

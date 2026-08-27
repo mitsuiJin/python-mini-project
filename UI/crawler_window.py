@@ -26,7 +26,7 @@ class CrawlerMainWindow(MainWindow):
 
         self.fault_reason_var = tk.StringVar(value="")
         self.crawl_query_var = tk.StringVar(value="")
-        self.crawl_limit_var = tk.IntVar(value=5)
+        self.crawl_limit_var = tk.IntVar(value=10)
         self.crawl_headless_var = tk.BooleanVar(value=True)
         self.crawler_tab = ttk.Frame(self.notebook)
         self.notebook.insert(2, self.crawler_tab, text="고장 원인 조사")
