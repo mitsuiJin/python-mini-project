@@ -15,25 +15,42 @@ plt.rcParams["axes.unicode_minus"] = False
 class DataVisualizer:
     """matplotlib Figure 시각화 그래프들"""
 
+    SENSOR_CATEGORY_ORDER = ("Time", "속도", "압력", "위치")
+    SENSOR_CATEGORY_COLORS = {
+        "Time": "#F59E0B",
+        "속도": "#8B5CF6",
+        "압력": "#3B82F6",
+        "위치": "#22C55E",
+    }
+    SENSOR_CATEGORY_BACKGROUNDS = {
+        "Time": "#FFF7ED",
+        "속도": "#F5F3FF",
+        "압력": "#EFF6FF",
+        "위치": "#F0FDF4",
+    }
+    SENSOR_DISPLAY_NAMES = {
+        "Injection_Time": "Injection",
+        "Filling_Time": "Filling",
+        "Plasticizing_Time": "Plasticize",
+        "Cycle_Time": "Cycle",
+        "Clamp_Close_Time": "Clamp Close",
+        "Max_Injection_Speed": "Max Injection",
+        "Max_Screw_RPM": "Max Screw",
+        "Average_Screw_RPM": "Avg Screw",
+        "Max_Injection_Pressure": "Max Injection",
+        "Max_Switch_Over_Pressure": "Switch Over",
+        "Max_Back_Pressure": "Max Back",
+        "Average_Back_Pressure": "Avg Back",
+        "Cushion_Position": "Cushion",
+        "Switch_Over_Position": "Switch Over",
+        "Plasticizing_Position": "Plasticize",
+        "Clamp_Open_Position": "Clamp Open",
+    }
     def __init__(self, df: pd.DataFrame):
         self.df = df.copy()
 
-    def plot_class_distribution(self, target_column: str) -> Figure:
-        """1. 종속변수의 클래스별 건수를 막대그래프로 표시"""
-        self._require_column(target_column)
-        counts = self.df[target_column].value_counts(dropna=False)
-
-        figure, axis = plt.subplots(figsize=(7, 4))
-        counts.plot(kind="bar", ax=axis, color="#3b82f6")
-        axis.set_title(f"{target_column} 분포")
-        axis.set_xlabel(target_column)
-        axis.set_ylabel("건수")
-        axis.tick_params(axis="x", rotation=0)
-        figure.tight_layout()
-        return figure
-
     def plot_histogram(self, column: str, bins: int = 30) -> Figure:
-        """2. 수치형 컬럼의 히스토그램을 생성"""
+        """1. 수치형 컬럼의 히스토그램을 생성"""
         self._require_numeric_column(column)
 
         figure, axis = plt.subplots(figsize=(7, 4))
@@ -46,7 +63,7 @@ class DataVisualizer:
         return figure
 
     def plot_boxplot(self, column: str, group_column: str | None = None) -> Figure:
-        """3. 전체 또는 그룹별 수치형 컬럼의 박스플롯을 생성"""
+        """2. 전체 또는 그룹별 수치형 컬럼의 박스플롯을 생성"""
         self._require_numeric_column(column)
         figure, axis = plt.subplots(figsize=(8, 5))
 
@@ -67,7 +84,7 @@ class DataVisualizer:
         return figure
 
     def plot_correlation_heatmap(self) -> Figure:
-        """4. 수치형 컬럼의 상관관계 히트맵을 생성"""
+        """3. 수치형 컬럼의 상관관계 히트맵을 생성"""
         correlation = self.df.select_dtypes(include="number").corr()
         if correlation.empty:
             raise ValueError("상관관계를 계산할 수치형 컬럼이 없습니다.")
@@ -194,48 +211,106 @@ class DataVisualizer:
         )
         axis.set_title("양품 · 불량 비율", loc="left", fontweight="bold", color="#172033")
 
-    @staticmethod
-    def _plot_numeric_means(axis, numeric_summary) -> None:
-        preferred = (
-            "Injection_Time", "Filling_Time", "Plasticizing_Time", "Cycle_Time",
-            "Max_Injection_Speed", "Max_Screw_RPM",
-            "Max_Injection_Pressure", "Hopper_Temperature",
-        )
-        indicators = [
-            indicator for indicator in preferred if indicator in numeric_summary.index
-        ]
-        if not indicators:
-            indicators = numeric_summary.index.astype(str).tolist()[:8]
-
+    @classmethod
+    def _plot_numeric_means(cls, axis, numeric_summary) -> None:
+        """센서 평균을 특성별 열로 나눈 색상 표로 표시한다."""
         axis.set_facecolor("white")
-        axis.set_title("주요 수치 지표 평균", loc="left", fontweight="bold", color="#172033")
-        if not indicators:
-            axis.text(0.5, 0.5, "표시할 수치 지표가 없습니다.", ha="center", va="center")
-            axis.axis("off")
+        axis.set_title(
+            "센서 특성별 주요 수치 평균",
+            loc="left",
+            fontweight="bold",
+            color="#172033",
+        )
+        axis.axis("off")
+
+        required_columns = {"category", "mean"}
+        if numeric_summary.empty or not required_columns.issubset(
+            numeric_summary.columns
+        ):
+            axis.text(
+                0.5,
+                0.5,
+                "표시할 센서 평균이 없습니다.",
+                ha="center",
+                va="center",
+            )
             return
 
-        means = numeric_summary.loc[indicators, "mean"].astype(float)
-        max_value = means.abs().max()
-        relative = means.abs() / max_value if max_value else means.abs()
-        positions = np.arange(len(indicators))
-        bars = axis.barh(positions, relative, color="#64748B", height=0.62)
-        axis.set_yticks(positions, indicators, fontsize=8)
-        axis.invert_yaxis()
-        axis.set_xlim(0, 1.22)
-        axis.set_xticks([])
-        axis.set_xlabel("막대 길이는 지표 내 상대 크기 · 라벨은 실제 평균값", fontsize=8)
-        axis.grid(False)
-        for spine in axis.spines.values():
-            spine.set_visible(False)
-        for bar, value in zip(bars, means):
+        category_rows = {}
+        for category in cls.SENSOR_CATEGORY_ORDER:
+            rows = numeric_summary.loc[
+                numeric_summary["category"].eq(category),
+                ["mean"],
+            ]
+            category_rows[category] = list(rows.itertuples())
+
+        maximum_sensors = max(
+            (len(rows) for rows in category_rows.values()),
+            default=0,
+        )
+        if maximum_sensors == 0:
             axis.text(
-                min(bar.get_width() + 0.025, 1.05),
-                bar.get_y() + bar.get_height() / 2,
-                f"{value:,.2f}",
+                0.5,
+                0.5,
+                "Time·속도·압력·위치 센서가 없습니다.",
+                ha="center",
                 va="center",
-                fontsize=8,
-                color="#172033",
             )
+            return
+
+        cell_text = []
+        for category in cls.SENSOR_CATEGORY_ORDER:
+            table_row = [category]
+            rows = category_rows[category]
+            for column_index in range(maximum_sensors):
+                if column_index >= len(rows):
+                    table_row.append("")
+                    continue
+                row = rows[column_index]
+                indicator = cls.SENSOR_DISPLAY_NAMES.get(
+                    str(row.Index),
+                    str(row.Index).replace("_", " "),
+                )
+                table_row.append(f"{indicator}  {float(row.mean):,.2f}")
+            cell_text.append(table_row)
+
+        column_labels = ["특성"] + [
+            f"센서 {index}"
+            for index in range(1, maximum_sensors + 1)
+        ]
+        first_width = 0.13
+        sensor_width = (1.0 - first_width) / maximum_sensors
+        table = axis.table(
+            cellText=cell_text,
+            colLabels=column_labels,
+            colWidths=[first_width] + [sensor_width] * maximum_sensors,
+            cellLoc="center",
+            colLoc="center",
+            loc="center",
+            bbox=[0.0, 0.02, 1.0, 0.90],
+        )
+        table.auto_set_font_size(False)
+        table.set_fontsize(6.2)
+
+        for column_index in range(maximum_sensors + 1):
+            header = table[(0, column_index)]
+            header.set_facecolor("#475569")
+            header.set_edgecolor("white")
+            header.get_text().set_color("white")
+            header.get_text().set_fontweight("bold")
+
+        for row_index, category in enumerate(cls.SENSOR_CATEGORY_ORDER, start=1):
+            category_cell = table[(row_index, 0)]
+            category_cell.set_facecolor(cls.SENSOR_CATEGORY_COLORS[category])
+            category_cell.set_edgecolor("white")
+            category_cell.get_text().set_color("white")
+            category_cell.get_text().set_fontweight("bold")
+            for column_index in range(1, maximum_sensors + 1):
+                cell = table[(row_index, column_index)]
+                cell.set_facecolor(cls.SENSOR_CATEGORY_BACKGROUNDS[category])
+                cell.set_edgecolor("white")
+                cell.get_text().set_color("#172033")
+
 
     @staticmethod
     def _plot_fault_reasons(axis, distribution) -> None:

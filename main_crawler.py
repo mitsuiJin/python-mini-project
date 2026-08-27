@@ -1,12 +1,12 @@
-"""고장 원인 동적 웹 조사가 포함된 제조 데이터 분석 UI 실행 파일."""
+"""고장 원인 조사가 포함된 ttkbootstrap 분석 UI 실행 진입점."""
 
-import tkinter as tk
+import ttkbootstrap as ttk
 
 from UI.crawler_window import CrawlerMainWindow
 
 
 def main() -> None:
-    root = tk.Tk()
+    root = ttk.Window(themename="united")
     CrawlerMainWindow(root)
     root.mainloop()
 

@@ -3,7 +3,9 @@
 import warnings
 from pathlib import Path
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox
+
+import ttkbootstrap as ttk
 
 # sklearn 1.9+ SVC(probability=True) 지원 경고: 준지도 학습 교차검증마다
 # 매번 뜨는 잡음이라 숨긴다.
@@ -37,9 +39,12 @@ class MainWindow:
 
     def __init__(self, root: tk.Tk):
         self.root = root
+        self.style = ttk.Style(theme="united")
         self.root.title("CN7 · RG3 사출성형 데이터 분석")
-        self.root.geometry("1380x820")
+        self.root.geometry("1360x900")
         self.root.minsize(1100, 680)
+        self.root.configure(background=self.style.colors.bg)
+        self._configure_styles()
 
         self.loader = DataLoader()
         self.raw_df: pd.DataFrame | None = None
@@ -50,43 +55,97 @@ class MainWindow:
         self.analysis_chart_canvas: FigureCanvasTkAgg | None = None
         self.model_chart_canvas: FigureCanvasTkAgg | None = None
         self.dashboard_kpi_vars: dict[str, tuple[tk.StringVar, tk.StringVar]] = {}
+        self._tab_icons: dict[str, tk.PhotoImage] = {}
         self.cv_comparison: pd.DataFrame | None = None
         self.cv_results: dict[str, CVResult] | None = None
 
         self.file_path_var = tk.StringVar(value=str(DEFAULT_DATA_PATH))
         self.cn7_rg3_only_var = tk.BooleanVar(value=True)
-        self.chart_type_var = tk.StringVar(value="불량 분포")
+        self.chart_type_var = tk.StringVar(value="히스토그램")
         self.sensor_var = tk.StringVar(value="Injection_Time")
         self.model_product_var = tk.StringVar(value="cn7")
         self.pseudo_label_var = tk.BooleanVar(value=False)
         self.status_var = tk.StringVar(value="CSV 파일을 불러오세요.")
         self._build_ui()
 
+    def _configure_styles(self) -> None:
+        """제조 분석 화면 전반에 적용할 공통 시각 스타일을 정의한다."""
+        self.style.configure("App.TFrame", background=self.style.colors.bg)
+        self.style.configure(
+            "Header.TLabel",
+            font=("Malgun Gothic", 22, "bold"),
+            foreground=self.style.colors.dark,
+        )
+        self.style.configure(
+            "Subheader.TLabel",
+            font=("Malgun Gothic", 9),
+            foreground=self.style.colors.secondary,
+        )
+        self.style.configure(
+            "Section.TLabel",
+            font=("Malgun Gothic", 11, "bold"),
+            foreground=self.style.colors.dark,
+        )
+        self.style.configure("Treeview", rowheight=25, font=("Malgun Gothic", 9))
+        self.style.configure(
+            "Treeview.Heading", font=("Malgun Gothic", 9, "bold")
+        )
+        self.style.configure("TNotebook.Tab", padding=(15, 7))
+        self.style.configure("Status.TLabel", font=("Malgun Gothic", 9))
+
     def _build_ui(self) -> None:
         self.root.columnconfigure(0, weight=1)
-        self.root.rowconfigure(1, weight=1)
+        self.root.rowconfigure(3, weight=1)
 
-        toolbar = ttk.Frame(self.root, padding=10)
-        toolbar.grid(row=0, column=0, sticky="ew")
-        toolbar.columnconfigure(1, weight=1)
-        ttk.Label(toolbar, text="CSV 파일").grid(row=0, column=0, padx=(0, 6))
-        ttk.Entry(toolbar, textvariable=self.file_path_var).grid(
-            row=0, column=1, sticky="ew", padx=(0, 6)
+        heading = ttk.Frame(self.root, padding=(20, 15, 20, 8), style="App.TFrame")
+        heading.grid(row=0, column=0, sticky="ew")
+        heading.columnconfigure(0, weight=1)
+        ttk.Label(
+            heading, text="사출성형 품질 분석", style="Header.TLabel"
+        ).grid(row=0, column=0, sticky="w")
+        ttk.Label(
+            heading,
+            text="CN7 · RG3 공정 데이터 분석 및 불량 예측",
+            style="Subheader.TLabel",
+        ).grid(row=1, column=0, sticky="w", pady=(2, 0))
+        ttk.Label(
+            heading,
+            text="MANUFACTURING QUALITY SYSTEM",
+            bootstyle="primary",
+            font=("Segoe UI", 8, "bold"),
+        ).grid(row=0, column=1, rowspan=2, sticky="e")
+        ttk.Separator(self.root).grid(row=1, column=0, sticky="ew", padx=20)
+
+        toolbar = ttk.Labelframe(
+            self.root, text="데이터 작업", padding=(10, 8), bootstyle="secondary"
         )
-        ttk.Button(toolbar, text="찾아보기", command=self.browse_file).grid(
+        toolbar.grid(row=2, column=0, sticky="ew", padx=20, pady=(10, 8))
+        toolbar.columnconfigure(1, weight=1)
+        ttk.Label(toolbar, text="CSV 파일").grid(row=0, column=0, padx=(0, 10))
+        ttk.Entry(toolbar, textvariable=self.file_path_var).grid(
+            row=0, column=1, sticky="ew", padx=(0, 8), ipady=4
+        )
+        ttk.Button(
+            toolbar,
+            text="찾아보기",
+            command=self.browse_file,
+            bootstyle="dark",
+        ).grid(
             row=0, column=2, padx=3
         )
 
         buttons = (
-            ("1. 데이터 로드", self.load_data),
-            ("2. 전처리", self.preprocess_data),
-            ("3. 분석", self.run_analysis),
+            ("1. 데이터 로드", self.load_data, "primary"),
+            ("2. 전처리", self.preprocess_data, "secondary"),
+            ("3. 분석", self.run_analysis, "success"),
+            ("4. 모델 학습", self.run_model_evaluation, "info"),
         )
 
-        for column, (label, action) in enumerate(buttons, start=3):
+        for column, (label, action, bootstyle) in enumerate(buttons, start=3):
             ttk.Button(
                 toolbar,
                 text=label,
+                bootstyle=bootstyle,
                 command=lambda selected=action: self._run_ui_action(selected),
             ).grid(row=0, column=column, padx=3)
 
@@ -94,30 +153,65 @@ class MainWindow:
             toolbar,
             text="CN7·RG3만 사용",
             variable=self.cn7_rg3_only_var,
-        ).grid(row=1, column=1, sticky="w", pady=(7, 0))
+            bootstyle="primary",
+        ).grid(row=1, column=1, sticky="w", pady=(9, 0))
 
-        self.notebook = ttk.Notebook(self.root)
-        self.notebook.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 8))
+        self.notebook = ttk.Notebook(self.root, bootstyle="primary")
+        self.notebook.grid(row=3, column=0, sticky="nsew", padx=20, pady=(0, 8))
         self.preview_tab = ttk.Frame(self.notebook)
         self.analysis_tab = ttk.Frame(self.notebook)
         self.chart_tab = ttk.Frame(self.notebook)
         self.model_tab = ttk.Frame(self.notebook)
-        self.notebook.add(self.preview_tab, text="데이터 미리보기")
-        self.notebook.add(self.analysis_tab, text="분석 대시보드")
-        self.notebook.add(self.chart_tab, text="시각화")
-        self.notebook.add(self.model_tab, text="모델 및 예측")
+        self.notebook.add(
+            self.preview_tab,
+            text=" 데이터 미리보기",
+            image=self._make_tab_icon("preview", self.style.colors.primary),
+            compound="left",
+        )
+        self.notebook.add(
+            self.analysis_tab,
+            text=" 분석 대시보드",
+            image=self._make_tab_icon("analysis", self.style.colors.success),
+            compound="left",
+        )
+        self.notebook.add(
+            self.chart_tab,
+            text=" 시각화",
+            image=self._make_tab_icon("chart", self.style.colors.info),
+            compound="left",
+        )
+        self.notebook.add(
+            self.model_tab,
+            text=" 모델 및 예측",
+            image=self._make_tab_icon("model", self.style.colors.warning),
+            compound="left",
+        )
 
         self._build_preview_tab()
         self._build_analysis_tab()
         self._build_chart_tab()
         self._build_model_tab()
+        status_frame = ttk.Frame(self.root, padding=(20, 6))
+        status_frame.grid(row=4, column=0, sticky="ew")
         ttk.Label(
-            self.root,
+            status_frame,
+            text="●",
+            bootstyle="primary",
+            font=("Arial", 9),
+        ).pack(side="left", padx=(0, 7))
+        ttk.Label(
+            status_frame,
             textvariable=self.status_var,
-            relief="sunken",
             anchor="w",
-            padding=5,
-        ).grid(row=2, column=0, sticky="ew")
+            style="Status.TLabel",
+        ).pack(side="left", fill="x", expand=True)
+
+    def _make_tab_icon(self, name: str, color: str) -> tk.PhotoImage:
+        """Notebook 탭을 테마 색상으로 구분하는 작은 사각 아이콘을 만든다."""
+        icon = tk.PhotoImage(width=11, height=11)
+        icon.put(color, to=(1, 1, 10, 10))
+        self._tab_icons[name] = icon
+        return icon
 
     def _build_preview_tab(self) -> None:
         self.preview_tab.columnconfigure(0, weight=1)
@@ -160,15 +254,60 @@ class MainWindow:
             anchor="w",
         ).pack(fill="x", pady=(3, 0))
 
+        kpi_frame = tk.Frame(self.analysis_tab, bg="#F4F7FB", padx=10, pady=10)
+        kpi_frame.grid(row=1, column=0, sticky="ew")
         kpi_specs = (
             ("total", "전체 데이터", "#475569"),
             ("cn7", "CN7 비율", "#2563EB"),
             ("rg3", "RG3 비율", "#14B8A6"),
             ("defect", "전체 불량률", "#EF4444"),
         )
-        _, self.dashboard_kpi_vars = self._build_kpi_row(
-            self.analysis_tab, kpi_specs, default_detail="분석 버튼을 눌러주세요.", row=1
-        )
+        for column, (key, title, accent) in enumerate(kpi_specs):
+            kpi_frame.columnconfigure(column, weight=1, uniform="dashboard_kpi")
+            card = tk.Frame(
+                kpi_frame,
+                bg="white",
+                highlightbackground="#DCE3ED",
+                highlightthickness=1,
+                padx=14,
+                pady=9,
+            )
+            card.grid(
+                row=0,
+                column=column,
+                sticky="nsew",
+                padx=(0 if column == 0 else 5, 0 if column == 3 else 5),
+            )
+            title_row = tk.Frame(card, bg="white")
+            title_row.pack(fill="x")
+            tk.Frame(title_row, bg=accent, width=5, height=18).pack(side="left")
+            tk.Label(
+                title_row,
+                text=title,
+                bg="white",
+                fg="#64748B",
+                font=("Malgun Gothic", 9, "bold"),
+            ).pack(side="left", padx=(7, 0))
+
+            value_var = tk.StringVar(value="—")
+            detail_var = tk.StringVar(value="분석 버튼을 눌러주세요.")
+            tk.Label(
+                card,
+                textvariable=value_var,
+                bg="white",
+                fg="#172033",
+                font=("Malgun Gothic", 18, "bold"),
+                anchor="w",
+            ).pack(fill="x", pady=(5, 0))
+            tk.Label(
+                card,
+                textvariable=detail_var,
+                bg="white",
+                fg="#64748B",
+                font=("Malgun Gothic", 8),
+                anchor="w",
+            ).pack(fill="x")
+            self.dashboard_kpi_vars[key] = (value_var, detail_var)
 
         self.dashboard_chart_frame = tk.Frame(
             self.analysis_tab,
@@ -187,7 +326,7 @@ class MainWindow:
         ttk.Combobox(
             controls,
             textvariable=self.chart_type_var,
-            values=("불량 분포", "히스토그램", "품질별 박스플롯", "상관관계(heatmap)"),
+            values=("히스토그램", "품질별 박스플롯", "상관관계(heatmap)"),
             state="readonly",
             width=18,
         ).pack(side="left", padx=6)
@@ -207,80 +346,17 @@ class MainWindow:
         self.chart_frame = ttk.Frame(self.chart_tab)
         self.chart_frame.grid(row=1, column=0, sticky="nsew")
 
-    def _build_kpi_row(
-        self,
-        parent: tk.Widget,
-        specs: tuple[tuple[str, str, str], ...],
-        default_detail: str = "",
-        row: int = 0,
-    ) -> tuple[tk.Frame, dict[str, tuple[tk.StringVar, tk.StringVar]]]:
-        """제목/강조색이 있는 카드형 KPI 위젯 여러 개를 한 행에 배치한다.
-
-        specs: (key, 제목, 강조색) 튜플들. 반환된 dict[key]로 각 카드의
-        (value_var, detail_var)에 접근해 값을 갱신한다.
-        """
-        kpi_frame = tk.Frame(parent, bg="#F4F7FB", padx=10, pady=10)
-        kpi_frame.grid(row=row, column=0, sticky="ew")
-        kpi_vars: dict[str, tuple[tk.StringVar, tk.StringVar]] = {}
-        last = len(specs) - 1
-        for column, (key, title, accent) in enumerate(specs):
-            kpi_frame.columnconfigure(column, weight=1, uniform="kpi")
-            card = tk.Frame(
-                kpi_frame,
-                bg="white",
-                highlightbackground="#DCE3ED",
-                highlightthickness=1,
-                padx=14,
-                pady=9,
-            )
-            card.grid(
-                row=0,
-                column=column,
-                sticky="nsew",
-                padx=(0 if column == 0 else 5, 0 if column == last else 5),
-            )
-            title_row = tk.Frame(card, bg="white")
-            title_row.pack(fill="x")
-            tk.Frame(title_row, bg=accent, width=5, height=18).pack(side="left")
-            tk.Label(
-                title_row,
-                text=title,
-                bg="white",
-                fg="#64748B",
-                font=("Malgun Gothic", 9, "bold"),
-            ).pack(side="left", padx=(7, 0))
-
-            value_var = tk.StringVar(value="—")
-            detail_var = tk.StringVar(value=default_detail)
-            tk.Label(
-                card,
-                textvariable=value_var,
-                bg="white",
-                fg="#172033",
-                font=("Malgun Gothic", 18, "bold"),
-                anchor="w",
-            ).pack(fill="x", pady=(5, 0))
-            tk.Label(
-                card,
-                textvariable=detail_var,
-                bg="white",
-                fg="#64748B",
-                font=("Malgun Gothic", 8),
-                anchor="w",
-            ).pack(fill="x")
-            kpi_vars[key] = (value_var, detail_var)
-        return kpi_frame, kpi_vars
-
     def _build_model_tab(self) -> None:
         # 준지도 학습 파이프라인(GaussianNB/RandomForest/SVM, ML/evaluation.py)을
         # 5-fold 교차검증으로 실행한다. 라벨 있는 불량 표본이 매우 적어서
         # (CN7 17건, RG3 25건) 단일 train/test 분리 대신 교차검증 평균을 쓴다.
         # 자세한 배경은 scripts/run_semi_supervised.py 참고.
         self.model_tab.columnconfigure(0, weight=1)
-        self.model_tab.rowconfigure(2, weight=1)
+        self.model_tab.columnconfigure(1, weight=1)
+        self.model_tab.rowconfigure(1, weight=1)
 
         controls = ttk.Frame(self.model_tab, padding=8)
-        controls.grid(row=0, column=0, sticky="ew")
+        controls.grid(row=0, column=0, columnspan=2, sticky="ew")
         ttk.Label(controls, text="제품").pack(side="left")
         ttk.Combobox(
             controls,
@@ -299,22 +375,26 @@ class MainWindow:
             text="5-fold 교차검증 실행",
             command=lambda: self._run_ui_action(self.run_model_evaluation),
         ).pack(side="left", padx=(0, 6))
+        ttk.Button(
+            controls,
+            text="비교 그래프 표시",
+            command=lambda: self._run_ui_action(self.render_model_chart),
+        ).pack(side="left", padx=6)
 
-        model_kpi_specs = (
-            ("data", "라벨 데이터", "#475569"),
-            ("best_model", "최고 모델", "#2563EB"),
-            ("f1", "F1 (최고 모델)", "#14B8A6"),
-            ("roc_auc", "ROC-AUC (최고 모델)", "#EF4444"),
+        text_frame = ttk.Frame(self.model_tab)
+        text_frame.grid(row=1, column=0, sticky="nsew")
+        text_frame.columnconfigure(0, weight=1)
+        text_frame.rowconfigure(0, weight=1)
+        self.model_text = tk.Text(text_frame, wrap="none", font=("Consolas", 10))
+        self.model_text.grid(row=0, column=0, sticky="nsew")
+        scroll = ttk.Scrollbar(
+            text_frame, orient="vertical", command=self.model_text.yview
         )
-        _, self.model_kpi_vars = self._build_kpi_row(
-            self.model_tab,
-            model_kpi_specs,
-            default_detail="교차검증을 실행하세요.",
-            row=1,
-        )
+        scroll.grid(row=0, column=1, sticky="ns")
+        self.model_text.configure(yscrollcommand=scroll.set)
 
-        self.model_chart_frame = tk.Frame(self.model_tab, bg="#F4F7FB")
-        self.model_chart_frame.grid(row=2, column=0, sticky="nsew", pady=(8, 0))
+        self.model_chart_frame = ttk.Frame(self.model_tab)
+        self.model_chart_frame.grid(row=1, column=1, sticky="nsew")
 
     def browse_file(self) -> None:
         selected = filedialog.askopenfilename(
@@ -449,9 +529,7 @@ class MainWindow:
         self.visualizer = DataVisualizer(data)
         chart_type = self.chart_type_var.get()
         sensor = self.sensor_var.get()
-        if chart_type == "불량 분포":
-            figure = self.visualizer.plot_class_distribution("PassOrFail")
-        elif chart_type == "히스토그램":
+        if chart_type == "히스토그램":
             figure = self.visualizer.plot_histogram(sensor)
         elif chart_type == "품질별 박스플롯":
             figure = self.visualizer.plot_boxplot(sensor, "PassOrFail")
@@ -489,98 +567,44 @@ class MainWindow:
         comparison = pd.DataFrame(rows).T.sort_values("f1", ascending=False)
         self.cv_comparison = comparison
         self.cv_results = results
-        best_name = comparison.index[0]
-        best_row = comparison.loc[best_name]
 
-        kpi_values = {
-            "data": (
-                f"{len(data.X_labeled):,}건",
-                f"불량 {int(data.y_labeled.sum())}건 ({data.y_labeled.mean():.2%})",
-            ),
-            "best_model": (best_name, "F1 기준 1위"),
-            "f1": (
-                f"{best_row['f1']:.3f}",
-                f"precision {best_row['precision']:.2f} · recall {best_row['recall']:.2f}",
-            ),
-            "roc_auc": (f"{best_row['roc_auc']:.3f}", "5-fold 평균"),
-        }
-        for key, (value, detail) in kpi_values.items():
-            value_var, detail_var = self.model_kpi_vars[key]
-            value_var.set(value)
-            detail_var.set(detail)
-
-        figure = self._build_model_result_figure(product, comparison, results)
-        self._show_figure(figure, self.model_chart_frame, "model_chart_canvas")
-
+        confusion_lines = [
+            f"[{name} 합산 혼동행렬 (5-fold)]\n{result.pooled_confusion_matrix()}"
+            for name, result in results.items()
+        ]
+        report = "\n\n".join(
+            [
+                f"[{product.upper()} 라벨 데이터] {len(data.X_labeled):,}건 "
+                f"(불량 {int(data.y_labeled.sum())}건, {data.y_labeled.mean():.2%})",
+                f"[결과 비교 (5-fold 교차검증 평균, F1 기준 정렬)]\n"
+                + comparison.to_string(float_format=lambda value: f"{value:.4f}"),
+                *confusion_lines,
+            ]
+        )
+        self._set_text(self.model_text, report)
         self.notebook.select(self.model_tab)
+        best_name = comparison.index[0]
         self.status_var.set(
             f"{product.upper()} 교차검증 완료: 최고 모델 {best_name} "
-            f"(F1={best_row['f1']:.3f})"
+            f"(F1={comparison.loc[best_name, 'f1']:.3f})"
         )
         return comparison
 
-    @staticmethod
-    def _build_model_result_figure(
-        product: str, comparison: pd.DataFrame, results: dict[str, "CVResult"]
-    ):
-        """모델별 성능 비교 막대그래프 + 모델별 혼동행렬 히트맵을 한 이미지로 구성."""
-        model_count = len(results)
-        figure = plt.figure(figsize=(11, 7.5))
-        grid = figure.add_gridspec(2, model_count, height_ratios=[1.15, 1])
-
-        metric_colors = {
-            "precision": "#2563EB",
-            "recall": "#14B8A6",
-            "f1": "#F59E0B",
-            "roc_auc": "#EF4444",
-        }
-        bar_axis = figure.add_subplot(grid[0, :])
-        metrics = list(metric_colors)
-        bars = comparison[metrics].plot(
-            kind="bar",
-            ax=bar_axis,
-            color=[metric_colors[m] for m in metrics],
-            width=0.75,
+    def render_model_chart(self):
+        if self.cv_comparison is None:
+            raise RuntimeError("먼저 교차검증을 실행하세요.")
+        figure, axis = plt.subplots(figsize=(6, 4.5))
+        self.cv_comparison[["precision", "recall", "f1", "roc_auc"]].plot(
+            kind="bar", ax=axis
         )
-        for container in bars.containers:
-            bar_axis.bar_label(container, fmt="%.2f", fontsize=7, padding=1)
-        bar_axis.set_title(
-            f"{product.upper()} 모델별 성능 비교 (5-fold 교차검증 평균)",
-            fontsize=13,
-            fontweight="bold",
-            loc="left",
-        )
-        bar_axis.set_ylim(0, 1.08)
-        bar_axis.set_ylabel("score")
-        bar_axis.tick_params(axis="x", rotation=0)
-        bar_axis.legend(loc="upper right", ncol=4, fontsize=8, frameon=False)
-        bar_axis.spines["top"].set_visible(False)
-        bar_axis.spines["right"].set_visible(False)
-        bar_axis.grid(axis="y", alpha=0.3)
-
-        for index, name in enumerate(comparison.index):
-            axis = figure.add_subplot(grid[1, index])
-            matrix = results[name].pooled_confusion_matrix()
-            axis.imshow(matrix, cmap="Blues", vmin=0)
-            half = matrix.max() / 2 if matrix.max() else 0
-            for row in range(matrix.shape[0]):
-                for col in range(matrix.shape[1]):
-                    value = matrix[row, col]
-                    axis.text(
-                        col,
-                        row,
-                        f"{value}",
-                        ha="center",
-                        va="center",
-                        fontsize=11,
-                        fontweight="bold",
-                        color="white" if value > half else "#172033",
-                    )
-            axis.set_xticks([0, 1], ["예측 양품", "예측 불량"], fontsize=8)
-            axis.set_yticks([0, 1], ["실제 양품", "실제 불량"], fontsize=8)
-            axis.set_title(name, fontsize=10)
-
+        axis.set_title(f"{self.model_product_var.get().upper()} 모델별 성능 비교")
+        axis.set_ylabel("점수")
+        axis.set_ylim(0, 1)
+        axis.tick_params(axis="x", rotation=0)
+        axis.legend(loc="upper right", fontsize=8)
         figure.tight_layout()
+        self._show_figure(figure, self.model_chart_frame, "model_chart_canvas")
+        self.status_var.set("모델 비교 그래프 표시")
         return figure
 
     def _analysis_data(self) -> pd.DataFrame:
@@ -621,6 +645,11 @@ class MainWindow:
         canvas.draw()
         canvas.get_tk_widget().pack(fill="both", expand=True)
         setattr(self, canvas_attr, canvas)
+
+    @staticmethod
+    def _set_text(widget: tk.Text, content: str) -> None:
+        widget.delete("1.0", "end")
+        widget.insert("1.0", content)
 
     def _run_ui_action(self, action) -> None:
         try:
