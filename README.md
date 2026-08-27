@@ -59,6 +59,7 @@ graph LR
 - 크롤링
   - [DynamicFaultCrawler](Crawling/dynamic_fault_crawler.py) : 고장 원인을 네이버에 자동으로 검색하고 관련 링크를 제공
 
+---
 ### [DataLoader](Analyze/data_loader.py)
 
 - def load_csv(self, file_path)
@@ -92,6 +93,21 @@ get_fault_reason_distribution() : 고장 원인 분석
   - 박스플롯 : 수치형 컬럼의 값이 어디에 몰려 있고, 얼마나 퍼져 있으며, 이상치가 있는지 확인
 - `def plot_correlation_heatmap(self) -> Figure`
   - 히트맵 : 어떤 수치형 변수끼리 같이 움직이는가 확인
+---
+### [ModelManager](ML/model_manager.py)
+
+### [Predictor](ML/predictor.py)
+
+---
+
+### [MainWindow](UI/main_window.py)
+
+### [CrawlerWindow](UI/crawler_window.py)
+
+---
+
+### [DynamicFaultCrawler](Crawling/dynamic_fault_crawler.py)
+
 
 ## 폴더 구조
 ```mermaid
