@@ -2,7 +2,7 @@
 
 import tkinter as tk
 
-from crawler_window import CrawlerMainWindow
+from UI.crawler_window import CrawlerMainWindow
 
 
 def main() -> None:

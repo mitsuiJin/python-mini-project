@@ -7,16 +7,16 @@ from tkinter import filedialog, messagebox, ttk
 import pandas as pd
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-from data_analyzer import DataAnalyzer
-from data_loader import DataLoader
-from data_visualizer import DataVisualizer
-from model_manager import ModelManager
-from predictor import Predictor
-from preprocessor import Preprocessor
+from Analyze.data_analyzer import DataAnalyzer
+from Analyze.data_loader import DataLoader
+from Analyze.data_visualizer import DataVisualizer
+from ML.model_manager import ModelManager
+from ML.predictor import Predictor
+from Analyze.preprocessor import Preprocessor
 
 
 DEFAULT_DATA_PATH = (
-    Path(__file__).resolve().parent
+    Path(__file__).resolve().parent.parent
     / "04. Dataset_Molding"
     / "dataset"
     / "labeled_data.csv"

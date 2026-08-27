@@ -1,3 +1,7 @@
+## 프로젝트 제목
+
+
+
 ## 데이터 분석 프로젝트 아키텍처
 
 ```mermaid
@@ -27,11 +31,20 @@ graph LR
     J --> N
     M --> N
 
-    N --> O[Tkinter Dashboard]
 
+
+    P[Dynamic Fault Crawler]
+    P --> Q
+    Q[CrawlerWindow]
+    N --> Q
     %% 클래스 글자색
     classDef pythonClass color:#0066ff;
 
     %% 클래스 지정
-    class B,D,F,G,H,L,N pythonClass;
+    class B,D,F,G,H,L,N,Q,P pythonClass;
 ```
+
+## 분석할 데이터
+labeled_data.csv
+
+## 해야하는 것

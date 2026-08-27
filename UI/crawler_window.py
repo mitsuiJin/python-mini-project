@@ -10,8 +10,8 @@ import webbrowser
 
 import pandas as pd
 
-from dynamic_fault_crawler import CrawlResult, DynamicFaultCrawler
-from main_window import MainWindow
+from Crawling.dynamic_fault_crawler import CrawlResult, DynamicFaultCrawler
+from .main_window import MainWindow
 
 
 class CrawlerMainWindow(MainWindow):
