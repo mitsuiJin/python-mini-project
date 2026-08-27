@@ -1,18 +1,25 @@
 """사출성형 제조 데이터 분석용 Tkinter 메인 화면."""
 
+import warnings
 from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
+# sklearn 1.9+ SVC(probability=True) 지원 경고: 준지도 학습 교차검증마다
+# 매번 뜨는 잡음이라 숨긴다.
+warnings.filterwarnings("ignore", category=FutureWarning, module="sklearn.svm")
+
+import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 from Analyze.data_analyzer import DataAnalyzer
 from Analyze.data_loader import DataLoader
 from Analyze.data_visualizer import DataVisualizer
-from ML.model_manager import ModelManager
-from ML.predictor import Predictor
 from Analyze.preprocessor import Preprocessor
+from ML.dataset import load_raw_product_data
+from ML.evaluation import CVResult, cross_validate
+from ML.models import build_model_factories
 
 
 DEFAULT_DATA_PATH = (
@@ -39,19 +46,19 @@ class MainWindow:
         self.clean_df: pd.DataFrame | None = None
         self.analyzer: DataAnalyzer | None = None
         self.visualizer: DataVisualizer | None = None
-        self.model_manager: ModelManager | None = None
-        self.predictor: Predictor | None = None
         self.chart_canvas: FigureCanvasTkAgg | None = None
-        self.model_chart_canvas: FigureCanvasTkAgg | None = None
         self.analysis_chart_canvas: FigureCanvasTkAgg | None = None
+        self.model_chart_canvas: FigureCanvasTkAgg | None = None
         self.dashboard_kpi_vars: dict[str, tuple[tk.StringVar, tk.StringVar]] = {}
+        self.cv_comparison: pd.DataFrame | None = None
+        self.cv_results: dict[str, CVResult] | None = None
 
         self.file_path_var = tk.StringVar(value=str(DEFAULT_DATA_PATH))
         self.cn7_rg3_only_var = tk.BooleanVar(value=True)
         self.chart_type_var = tk.StringVar(value="불량 분포")
         self.sensor_var = tk.StringVar(value="Injection_Time")
-        self.model_chart_type_var = tk.StringVar(value="모델별 성능 비교")
-        self.model_select_var = tk.StringVar(value="random_forest")
+        self.model_product_var = tk.StringVar(value="cn7")
+        self.pseudo_label_var = tk.BooleanVar(value=False)
         self.status_var = tk.StringVar(value="CSV 파일을 불러오세요.")
         self._build_ui()
 
@@ -74,7 +81,6 @@ class MainWindow:
             ("1. 데이터 로드", self.load_data),
             ("2. 전처리", self.preprocess_data),
             ("3. 분석", self.run_analysis),
-            ("4. 모델 학습", self.train_model),
         )
 
         for column, (label, action) in enumerate(buttons, start=3):
@@ -247,42 +253,37 @@ class MainWindow:
         self.chart_frame.grid(row=1, column=0, sticky="nsew")
 
     def _build_model_tab(self) -> None:
+        # 준지도 학습 파이프라인(GaussianNB/RandomForest/SVM, ML/evaluation.py)을
+        # 5-fold 교차검증으로 실행한다. 라벨 있는 불량 표본이 매우 적어서
+        # (CN7 17건, RG3 25건) 단일 train/test 분리 대신 교차검증 평균을 쓴다.
+        # 자세한 배경은 scripts/run_semi_supervised.py 참고.
         self.model_tab.columnconfigure(0, weight=1)
         self.model_tab.columnconfigure(1, weight=1)
         self.model_tab.rowconfigure(1, weight=1)
 
         controls = ttk.Frame(self.model_tab, padding=8)
         controls.grid(row=0, column=0, columnspan=2, sticky="ew")
+        ttk.Label(controls, text="제품").pack(side="left")
+        ttk.Combobox(
+            controls,
+            textvariable=self.model_product_var,
+            values=("cn7", "rg3"),
+            state="readonly",
+            width=8,
+        ).pack(side="left", padx=(4, 12))
+        ttk.Checkbutton(
+            controls,
+            text="pseudo-labeling 사용 (가이드북 방식, 느림)",
+            variable=self.pseudo_label_var,
+        ).pack(side="left", padx=(0, 12))
         ttk.Button(
             controls,
-            text="모델 학습 & 비교",
-            command=lambda: self._run_ui_action(self.train_model),
+            text="5-fold 교차검증 실행",
+            command=lambda: self._run_ui_action(self.run_model_evaluation),
         ).pack(side="left", padx=(0, 6))
         ttk.Button(
             controls,
-            text="예측 실행",
-            command=lambda: self._run_ui_action(self.run_prediction),
-        ).pack(side="left", padx=(0, 12))
-
-        ttk.Label(controls, text="그래프").pack(side="left")
-        ttk.Combobox(
-            controls,
-            textvariable=self.model_chart_type_var,
-            values=("모델별 성능 비교", "혼동행렬", "ROC 커브", "피처 중요도"),
-            state="readonly",
-            width=16,
-        ).pack(side="left", padx=6)
-        ttk.Label(controls, text="모델(피처 중요도용)").pack(side="left", padx=(6, 0))
-        self.model_select_combo = ttk.Combobox(
-            controls,
-            textvariable=self.model_select_var,
-            state="readonly",
-            width=20,
-        )
-        self.model_select_combo.pack(side="left", padx=6)
-        ttk.Button(
-            controls,
-            text="그래프 표시",
+            text="비교 그래프 표시",
             command=lambda: self._run_ui_action(self.render_model_chart),
         ).pack(side="left", padx=6)
 
@@ -449,78 +450,70 @@ class MainWindow:
         self.status_var.set(f"시각화 완료: {chart_type}")
         return figure
 
-    def train_model(self) -> pd.DataFrame:
-        data = self.clean_df if self.clean_df is not None else self.preprocess_data()
-        self.model_manager = ModelManager(data)
-        self.model_manager.train_all()
-        comparison = self.model_manager.evaluate_all()
-        best_name = comparison.index[0]
-        best_metrics = self.model_manager.evaluate(best_name)
-        self.predictor = Predictor(
-            self.model_manager.models[best_name], self.model_manager.feature_columns
-        )
-        candidate_lines = [
-            f"- {name}: {reason}"
-            for name, reason in self.model_manager.CANDIDATE_REASONS.items()
+    def run_model_evaluation(self) -> pd.DataFrame:
+        product = self.model_product_var.get()
+        use_pseudo_labeling = self.pseudo_label_var.get()
+        self.status_var.set(f"{product.upper()} 교차검증 실행 중...")
+        self.root.update_idletasks()
+
+        data = load_raw_product_data(product)
+        factories = build_model_factories()
+
+        rows = {}
+        results: dict[str, CVResult] = {}
+        for name, factory in factories.items():
+            result = cross_validate(
+                factory,
+                data.X_labeled,
+                data.y_labeled,
+                X_unlabeled=data.X_unlabeled if use_pseudo_labeling else None,
+                use_pseudo_labeling=use_pseudo_labeling,
+            )
+            results[name] = result
+            rows[name] = result.summary()
+
+        comparison = pd.DataFrame(rows).T.sort_values("f1", ascending=False)
+        self.cv_comparison = comparison
+        self.cv_results = results
+
+        confusion_lines = [
+            f"[{name} 합산 혼동행렬 (5-fold)]\n{result.pooled_confusion_matrix()}"
+            for name, result in results.items()
         ]
-        report = "\n".join(
+        report = "\n\n".join(
             [
-                "[후보 모델과 선택 이유]",
-                *candidate_lines,
-                "",
-                "[모델 성능 비교 (F1 기준 정렬)]",
-                comparison.to_string(float_format=lambda value: f"{value:.4f}"),
-                "",
-                f"[최고 모델 자동 선택] {self.model_manager.selection_reason()}",
-                "",
-                f"[{best_name} 상세 리포트]",
-                best_metrics["report"],
-                "[혼동행렬 (행=실제, 열=예측, 0=양품 1=불량)]",
-                str(best_metrics["confusion_matrix"]),
+                f"[{product.upper()} 라벨 데이터] {len(data.X_labeled):,}건 "
+                f"(불량 {int(data.y_labeled.sum())}건, {data.y_labeled.mean():.2%})",
+                f"[결과 비교 (5-fold 교차검증 평균, F1 기준 정렬)]\n"
+                + comparison.to_string(float_format=lambda value: f"{value:.4f}"),
+                *confusion_lines,
             ]
         )
         self._set_text(self.model_text, report)
-        self.model_select_combo.configure(values=list(self.model_manager.models.keys()))
-        self.model_select_var.set(best_name)
         self.notebook.select(self.model_tab)
+        best_name = comparison.index[0]
         self.status_var.set(
-            f"모델 학습 완료: 최고 모델 {best_name} (F1={best_metrics['f1']:.3f})"
+            f"{product.upper()} 교차검증 완료: 최고 모델 {best_name} "
+            f"(F1={comparison.loc[best_name, 'f1']:.3f})"
         )
         return comparison
 
     def render_model_chart(self):
-        if self.model_manager is None or not self.model_manager.models:
-            raise RuntimeError("먼저 모델을 학습하세요.")
-        chart_type = self.model_chart_type_var.get()
-        if chart_type == "모델별 성능 비교":
-            figure = self.model_manager.plot_model_comparison()
-        elif chart_type == "혼동행렬":
-            figure = self.model_manager.plot_confusion_matrices()
-        elif chart_type == "ROC 커브":
-            figure = self.model_manager.plot_roc_curves()
-        elif chart_type == "피처 중요도":
-            figure = self.model_manager.plot_feature_importance(self.model_select_var.get())
-        else:
-            raise ValueError(f"지원하지 않는 그래프입니다: {chart_type}")
-        self._show_figure(figure, self.model_chart_frame, "model_chart_canvas")
-        self.status_var.set(f"모델 그래프 표시: {chart_type}")
-        return figure
-
-    def run_prediction(self) -> pd.DataFrame:
-        if self.predictor is None:
-            raise RuntimeError("먼저 모델을 학습하세요.")
-        data = self._analysis_data()
-        predicted = self.predictor.predict_with_labels(data)
-        defect_count = int((predicted["predicted_target"] == 1).sum())
-        summary = (
-            f"\n[예측 결과] 총 {len(predicted):,}건 중 불량 예측 "
-            f"{defect_count:,}건 ({defect_count / len(predicted):.2%})"
+        if self.cv_comparison is None:
+            raise RuntimeError("먼저 교차검증을 실행하세요.")
+        figure, axis = plt.subplots(figsize=(6, 4.5))
+        self.cv_comparison[["precision", "recall", "f1", "roc_auc"]].plot(
+            kind="bar", ax=axis
         )
-        self.model_text.insert("end", summary)
-        self._update_preview(predicted)
-        self.notebook.select(self.preview_tab)
-        self.status_var.set("예측 완료")
-        return predicted
+        axis.set_title(f"{self.model_product_var.get().upper()} 모델별 성능 비교")
+        axis.set_ylabel("점수")
+        axis.set_ylim(0, 1)
+        axis.tick_params(axis="x", rotation=0)
+        axis.legend(loc="upper right", fontsize=8)
+        figure.tight_layout()
+        self._show_figure(figure, self.model_chart_frame, "model_chart_canvas")
+        self.status_var.set("모델 비교 그래프 표시")
+        return figure
 
     def _analysis_data(self) -> pd.DataFrame:
         if self.clean_df is not None:
