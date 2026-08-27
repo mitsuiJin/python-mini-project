@@ -1,4 +1,9 @@
 
+## 사용기술
+
+## 실행방법
+
+## 페이지 설명 (기능, 함수, 클래스 별로)
 
 ## Architecture
 
@@ -107,6 +112,8 @@ get_fault_reason_distribution() : 고장 원인 분석
 ---
 
 ### [DynamicFaultCrawler](Crawling/dynamic_fault_crawler.py)
+
+---
 
 
 ## 폴더 구조
