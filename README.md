@@ -8,7 +8,19 @@
 
 ## 기술스택
 
-- [기술스택 문서](doc/README_Stack.md)
+## 🛠️ Tech Stack
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white">
+  <img src="https://img.shields.io/badge/Pandas-150458?style=flat-square&logo=pandas&logoColor=white">
+  <img src="https://img.shields.io/badge/NumPy-013243?style=flat-square&logo=numpy&logoColor=white">
+  <img src="https://img.shields.io/badge/Matplotlib-11557C?style=flat-square&logo=python&logoColor=white">
+  <img src="https://img.shields.io/badge/scikit--learn-F7931E?style=flat-square&logo=scikitlearn&logoColor=white">
+  <img src="https://img.shields.io/badge/Tkinter-3776AB?style=flat-square&logo=python&logoColor=white">
+  <img src="https://img.shields.io/badge/ttkbootstrap-7952B3?style=flat-square&logo=bootstrap&logoColor=white">
+  <img src="https://img.shields.io/badge/Selenium-43B02A?style=flat-square&logo=selenium&logoColor=white">
+  <img src="https://img.shields.io/badge/BeautifulSoup-59666C?style=flat-square&logo=python&logoColor=white">
+</p>
 
 ---
 
